@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Resume Ranker</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            display: flex;
+            justify-content: center;
+            padding-top: 50px;
+        }
+
+        .container {
+            width: 700px;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        textarea, input[type="file"] {
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .result-card {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f9fafc;
+            border-radius: 6px;
+        }
+
+        .best {
+            background-color: #e8f5e9;
+            border-left: 5px solid #4CAF50;
+        }
+
+        .score-bar {
+            height: 10px;
+            background-color: #4CAF50;
+            margin-top: 5px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h2>AI Resume Ranking System</h2>
+
+    <form method="POST" enctype="multipart/form-data">
+        <label>Enter Job Description:</label><br>
+        <textarea name="job_desc" rows="6"></textarea>
+        <br><br>
+
+        <label>Upload Resumes (PDF):</label><br>
+        <input type="file" name="resumes" multiple>
+        <br><br>
+
+        <button type="submit">Rank Resumes</button>
+    </form>
+
+    {% if results %}
+        <h3>Ranking Results:</h3>
+
+        {% for name, score in results %}
+            <div class="result-card {% if loop.index == 1 %}best{% endif %}">
+                <strong>{{ name }}</strong><br>
+                Match Score: {{ (score * 100) | round(2) }}%
+
+                <div class="score-bar" style="width: {{ score * 100 }}%;"></div>
+            </div>
+        {% endfor %}
+
+    {% endif %}
+
+</div>
+
+</body>
+</html>
