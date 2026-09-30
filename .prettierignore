@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+build
+venv
+templates
+__pycache__
+*.pyc
+pnpm-lock.yaml
+.pnpm-store
