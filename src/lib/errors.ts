@@ -32,11 +32,13 @@ export class ValidationError extends AppError {
 
 export class DocumentProcessingError extends AppError {
   public readonly fileName?: string;
+  public readonly cause?: unknown;
 
-  constructor(message: string, fileName?: string) {
+  constructor(message: string, fileName?: string, cause?: unknown) {
     super(message, "DOCUMENT_PROCESSING_ERROR", 422);
     this.name = "DocumentProcessingError";
     this.fileName = fileName;
+    this.cause = cause;
   }
 }
 

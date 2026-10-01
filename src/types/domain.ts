@@ -4,6 +4,22 @@
  * parsed documents, and ranking evaluations.
  */
 
+/**
+ * Supported file formats for resume document ingestion.
+ */
+export type SupportedDocumentFormat = "pdf" | "docx" | "txt";
+
+/**
+ * Shared metadata DTO for ingested resume documents.
+ * Encapsulates client-provided file details without exposing filesystem paths.
+ */
+export interface DocumentMetadataDTO {
+  readonly fileName: string;
+  readonly mimeType: string;
+  readonly byteSize: number;
+  readonly format: SupportedDocumentFormat;
+}
+
 export interface CandidateSkill {
   name: string;
   category?:

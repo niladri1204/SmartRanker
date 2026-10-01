@@ -10,16 +10,23 @@ import { DocumentProcessingError } from "@/lib/errors";
 import { SupportedDocumentFormat } from "@/types";
 
 /**
- * PDF Document Parser Service Stub.
- * Architectural foundation for PDF text extraction.
- * Actual pdf-parse extraction logic is deferred to Phase 2.2.
+ * DOCX Document Parser Service Stub.
+ * Architectural foundation for DOCX raw-text extraction.
+ * Actual mammoth.extractRawText extraction logic is deferred to Phase 2.2.
  */
-export class PdfParserService implements IDocumentParser {
-  public readonly format: SupportedDocumentFormat = "pdf";
+export class DocxParserService implements IDocumentParser {
+  public readonly format: SupportedDocumentFormat = "docx";
 
   public supports(mimeType: string, fileName?: string): boolean {
-    if (mimeType === "application/pdf") return true;
-    if (fileName && fileName.toLowerCase().endsWith(".pdf")) return true;
+    if (
+      mimeType ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ) {
+      return true;
+    }
+    if (fileName && fileName.toLowerCase().endsWith(".docx")) {
+      return true;
+    }
     return false;
   }
 
@@ -31,21 +38,20 @@ export class PdfParserService implements IDocumentParser {
       );
     }
 
-    // Phase 2.2 will plug in pdf-parse extraction here:
-    // const parsed = await pdfParse(input.buffer);
+    // Phase 2.2 will plug in mammoth extraction here:
+    // const result = await mammoth.extractRawText({ buffer: input.buffer });
     return {
       rawText: "",
       characterCount: 0,
-      pageCount: 1,
-      format: "pdf",
+      format: "docx",
       warnings: [],
       extractedMetadata: {
         fileName: input.fileName,
         byteSize: input.byteSize,
-        parser: "PdfParserService",
+        parser: "DocxParserService",
       },
     };
   }
 }
 
-export const pdfParserService = new PdfParserService();
+export const docxParserService = new DocxParserService();
