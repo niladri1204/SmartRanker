@@ -46,6 +46,24 @@ const SAMPLE_TWO_PAGE_PDF = Buffer.from(
     "trailer\n<< /Root 1 0 R /Size 8 >>\nstartxref\n647\n%%EOF"
 );
 
+/**
+ * Minimal valid DOCX binary fixture.
+ * Embeds paragraphs: "John Doe Lead Developer", "Experienced TypeScript Architect"
+ */
+const SAMPLE_VALID_DOCX = Buffer.from(
+  "UEsDBAoAAAAAAEt5Ql15bjPXrQEAAK0BAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbDw/eG1sIHZlcnNpb249IjEuMCIgZW5jb2Rpbmc9IlVURi04IiBzdGFuZGFsb25lPSJ5ZXMiPz48VHlwZXMgeG1sbnM9Imh0dHA6Ly9zY2hlbWFzLm9wZW54bWxmb3JtYXRzLm9yZy9wYWNrYWdlLzIwMDYvY29udGVudC10eXBlcyI+PERlZmF1bHQgRXh0ZW5zaW9uPSJyZWxzIiBDb250ZW50VHlwZT0iYXBwbGljYXRpb24vdm5kLm9wZW54bWxmb3JtYXRzLXBhY2thZ2UucmVsYXRpb25zaGlwcyt4bWwiLz48RGVmYXVsdCBFeHRlbnNpb249InhtbCIgQ29udGVudFR5cGU9ImFwcGxpY2F0aW9uL3htbCIvPjxPdmVycmlkZSBQYXJ0TmFtZT0iL3dvcmQvZG9jdW1lbnQueG1sIiBDb250ZW50VHlwZT0iYXBwbGljYXRpb24vdm5kLm9wZW54bWxmb3JtYXRzLW9mZmljZWRvY3VtZW50LndvcmRwcm9jZXNzaW5nbWwuZG9jdW1lbnQubWFpbit4bWwiLz48L1R5cGVzPlBLAwQKAAAAAABLeUJdAAAAAAAAAAAAAAAABgAAAF9yZWxzL1BLAwQKAAAAAABLeUJdm/036ikBAAApAQAACwAAAF9yZWxzLy5yZWxzPD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9InllcyI/PjxSZWxhdGlvbnNoaXBzIHhtbG5zPSJodHRwOi8vc2NoZW1hcy5vcGVueG1sZm9ybWF0cy5vcmcvcGFja2FnZS8yMDA2L3JlbGF0aW9uc2hpcHMiPjxSZWxhdGlvbnNoaXAgSWQ9InJJZDEiIFR5cGU9Imh0dHA6Ly9zY2hlbWFzLm9wZW54bWxmb3JtYXRzLm9yZy9vZmZpY2VEb2N1bWVudC8yMDA2L3JlbGF0aW9uc2hpcHMvb2ZmaWNlRG9jdW1lbnQiIFRhcmdldD0id29yZC9kb2N1bWVudC54bWwiLz48L1JlbGF0aW9uc2hpcHM+UEsDBAoAAAAAAEt5Ql0AAAAAAAAAAAAAAAAFAAAAd29yZC9QSwMECgAAAAAAS3lCXRoydmQhAQAAIQEAABEAAAB3b3JkL2RvY3VtZW50LnhtbDw/eG1sIHZlcnNpb249IjEuMCIgZW5jb2Rpbmc9IlVURi04IiBzdGFuZGFsb25lPSJ5ZXMiPz48dzpkb2N1bWVudCB4bWxuczp3PSJodHRwOi8vc2NoZW1hcy5vcGVueG1sZm9ybWF0cy5vcmcvd29yZHByb2Nlc3NpbmdtbC8yMDA2L21haW4iPjx3OmJvZHk+PHc6cD48dzpyPjx3OnQ+Sm9obiBEb2UgTGVhZCBEZXZlbG9wZXI8L3c6dD48L3c6cj48L3c6cD48dzpwPjx3OnI+PHc6dD5FeHBlcmllbmNlZCBUeXBlU2NyaXB0IEFyY2hpdGVjdDwvdzp0PjwvdzpyPjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD5QSwECFAAKAAAAAABLeUJdeW4z160BAACtAQAAEwAAAAAAAAAAAAAAAAAAAAAAW0NvbnRlbnRfVHlwZXNdLnhtbFBLAQIUAAoAAAAAAEt5Ql0AAAAAAAAAAAAAAAAGAAAAAAAAAAAAEAAAAN4BAABfcmVscy9QSwECFAAKAAAAAABLeUJdm/036ikBAAApAQAACwAAAAAAAAAAAAAAAAACAgAAX3JlbHMvLnJlbHNQSwECFAAKAAAAAABLeUJdAAAAAAAAAAAAAAAABQAAAAAAAAAAABAAAABUAwAAd29yZC9QSwECFAAKAAAAAABLeUJdGjJ2ZCEBAAAhAQAAEQAAAAAAAAAAAAAAAAB3AwAAd29yZC9kb2N1bWVudC54bWxQSwUGAAAAAAUABQAgAQAAxwQAAAAA",
+  "base64"
+);
+
+/**
+ * Minimal valid DOCX binary fixture with unrecognised element to trigger Mammoth warnings.
+ * Embeds text: "Hello with warning"
+ */
+const SAMPLE_WARNING_DOCX = Buffer.from(
+  "UEsDBAoAAAAAAFh5Ql15bjPXrQEAAK0BAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbDw/eG1sIHZlcnNpb249IjEuMCIgZW5jb2Rpbmc9IlVURi04IiBzdGFuZGFsb25lPSJ5ZXMiPz48VHlwZXMgeG1sbnM9Imh0dHA6Ly9zY2hlbWFzLm9wZW54bWxmb3JtYXRzLm9yZy9wYWNrYWdlLzIwMDYvY29udGVudC10eXBlcyI+PERlZmF1bHQgRXh0ZW5zaW9uPSJyZWxzIiBDb250ZW50VHlwZT0iYXBwbGljYXRpb24vdm5kLm9wZW54bWxmb3JtYXRzLXBhY2thZ2UucmVsYXRpb25zaGlwcyt4bWwiLz48RGVmYXVsdCBFeHRlbnNpb249InhtbCIgQ29udGVudFR5cGU9ImFwcGxpY2F0aW9uL3htbCIvPjxPdmVycmlkZSBQYXJ0TmFtZT0iL3dvcmQvZG9jdW1lbnQueG1sIiBDb250ZW50VHlwZT0iYXBwbGljYXRpb24vdm5kLm9wZW54bWxmb3JtYXRzLW9mZmljZWRvY3VtZW50LndvcmRwcm9jZXNzaW5nbWwuZG9jdW1lbnQubWFpbit4bWwiLz48L1R5cGVzPlBLAwQKAAAAAABYeUJdAAAAAAAAAAAAAAAABgAAAF9yZWxzL1BLAwQKAAAAAABYeUJdm/036ikBAAApAQAACwAAAF9yZWxzLy5yZWxzPD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9InllcyI/PjxSZWxhdGlvbnNoaXBzIHhtbG5zPSJodHRwOi8vc2NoZW1hcy5vcGVueG1sZm9ybWF0cy5vcmcvcGFja2FnZS8yMDA2L3JlbGF0aW9uc2hpcHMiPjxSZWxhdGlvbnNoaXAgSWQ9InJJZDEiIFR5cGU9Imh0dHA6Ly9zY2hlbWFzLm9wZW54bWxmb3JtYXRzLm9yZy9vZmZpY2VEb2N1bWVudC8yMDA2L3JlbGF0aW9uc2hpcHMvb2ZmaWNlRG9jdW1lbnQiIFRhcmdldD0id29yZC9kb2N1bWVudC54bWwiLz48L1JlbGF0aW9uc2hpcHM+UEsDBAoAAAAAAFh5Ql0AAAAAAAAAAAAAAAAFAAAAd29yZC9QSwMECgAAAAAAWHlCXTDbQXkSAQAAEgEAABEAAAB3b3JkL2RvY3VtZW50LnhtbDw/eG1sIHZlcnNpb249IjEuMCIgZW5jb2Rpbmc9IlVURi04IiBzdGFuZGFsb25lPSJ5ZXMiPz48dzpkb2N1bWVudCB4bWxuczp3PSJodHRwOi8vc2NoZW1hcy5vcGVueG1sZm9ybWF0cy5vcmcvd29yZHByb2Nlc3NpbmdtbC8yMDA2L21haW4iPjx3OmJvZHk+PHc6cD48dzpyPjx3OnQ+SGVsbG8gd2l0aCB3YXJuaW5nPC93OnQ+PC93OnI+PC93OnA+PHc6dW5rbm93bkVsZW1lbnQ+U29tZSB1bmhhbmRsZWQgWE1MPC93OnVua25vd25FbGVtZW50Pjwvdzpib2R5Pjwvdzpkb2N1bWVudD5QSwECFAAKAAAAAABYeUJdeW4z160BAACtAQAAEwAAAAAAAAAAAAAAAAAAAAAAW0NvbnRlbnRfVHlwZXNdLnhtbFBLAQIUAAoAAAAAAFh5Ql0AAAAAAAAAAAAAAAAGAAAAAAAAAAAAEAAAAN4BAABfcmVscy9QSwECFAAKAAAAAABYeUJdm/036ikBAAApAQAACwAAAAAAAAAAAAAAAAACAgAAX3JlbHMvLnJlbHNQSwECFAAKAAAAAABYeUJdAAAAAAAAAAAAAAAABQAAAAAAAAAAABAAAABUAwAAd29yZC9QSwECFAAKAAAAAABYeUJdMNtBeRIBAAASAQAAEQAAAAAAAAAAAAAAAAB3AwAAd29yZC9kb2N1bWVudC54bWxQSwUGAAAAAAUABQAgAQAAuAQAAAAA",
+  "base64"
+);
+
 describe("Document Processing Foundation", () => {
   describe("detectDocumentFormat & sanitizeFileName", () => {
     it("should detect PDF from MIME type or file extension", () => {
@@ -226,22 +244,53 @@ describe("Document Processing Foundation", () => {
       expect(parser.supports("application/pdf")).toBe(false);
     });
 
-    it("should parse DOCX input into valid stub output", async () => {
+    it("should extract non-empty text and metadata from a valid DOCX", async () => {
       const input = createDocumentParseInput({
         fileName: "resume.docx",
         mimeType:
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        buffer: Buffer.from("PK mock docx zip binary"),
+        buffer: SAMPLE_VALID_DOCX,
       });
 
       const output = await parser.parse(input);
       expect(output.format).toBe("docx");
-      expect(output.characterCount).toBe(0);
+      expect(output.characterCount).toBeGreaterThan(0);
+      expect(output.rawText).toContain("John Doe Lead Developer");
+      expect(output.rawText).toContain("Experienced TypeScript Architect");
       expect(Array.isArray(output.warnings)).toBe(true);
       expect(output.extractedMetadata?.parser).toBe("DocxParserService");
+      expect(output.extractedMetadata?.fileName).toBe("resume.docx");
     });
 
-    it("should throw DocumentProcessingError when parsing unsupported input", async () => {
+    it("should preserve Mammoth warnings in the output warnings field", async () => {
+      const input = createDocumentParseInput({
+        fileName: "warn_resume.docx",
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        buffer: SAMPLE_WARNING_DOCX,
+      });
+
+      const output = await parser.parse(input);
+      expect(output.format).toBe("docx");
+      expect(output.rawText).toContain("Hello with warning");
+      expect(output.warnings?.some((w) => w.includes("unrecognised element"))).toBe(true);
+    });
+
+    it("should throw DocumentProcessingError when parsing invalid or corrupted DOCX buffer", async () => {
+      const corruptInput = createDocumentParseInput({
+        fileName: "corrupt.docx",
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        buffer: Buffer.from("PK-corrupted-random-junk-bytes-that-fail-docx-unzip"),
+      });
+
+      await expect(parser.parse(corruptInput)).rejects.toThrow(DocumentProcessingError);
+      await expect(parser.parse(corruptInput)).rejects.toThrow(
+        /Failed to parse DOCX document "corrupt\.docx"/
+      );
+    });
+
+    it("should throw DocumentProcessingError when parsing unsupported input format", async () => {
       const input = {
         fileName: "file.pdf",
         mimeType: "application/pdf",
@@ -264,7 +313,7 @@ describe("Document Processing Foundation", () => {
         fileName: "resume.docx",
         mimeType:
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        buffer: Buffer.from("PK docx data"),
+        buffer: SAMPLE_VALID_DOCX,
       });
 
       const pdfOutput = await documentParserService.parseDocument(pdfInput);
@@ -273,6 +322,7 @@ describe("Document Processing Foundation", () => {
       expect(pdfOutput.format).toBe("pdf");
       expect(pdfOutput.rawText).toContain("Jane Doe Senior Engineer");
       expect(docxOutput.format).toBe("docx");
+      expect(docxOutput.rawText).toContain("John Doe Lead Developer");
     });
 
     it("should throw DocumentProcessingError when format has no registered parser", async () => {
