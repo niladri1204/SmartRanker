@@ -4,10 +4,11 @@
 import { Candidate, JobDescription, ResumeDocument } from "@/types";
 import { ICandidateExtractor } from "./intelligence.interface";
 import { ExtractionError } from "@/lib/errors";
+import { jobDescriptionProcessorService } from "./job-description-processor.service";
 
 /**
- * Candidate Profile Extractor Service Stub.
- * Foundation for candidate attribute extraction (Phase 2).
+ * Candidate Profile Extractor Service.
+ * Foundation for candidate attribute and job requirement extraction.
  */
 export class CandidateExtractorService implements ICandidateExtractor {
   public async extractCandidate(document: ResumeDocument): Promise<Candidate> {
@@ -17,7 +18,7 @@ export class CandidateExtractorService implements ICandidateExtractor {
       );
     }
 
-    // Phase 2 will plug in candidate profiling and entity recognition
+    // Candidate profiling and entity recognition will be extended in subsequent phases
     return {
       id: `cand_${document.id}`,
       documentId: document.id,
@@ -31,11 +32,23 @@ export class CandidateExtractorService implements ICandidateExtractor {
   public async extractJobRequirements(
     jobDescription: JobDescription
   ): Promise<JobDescription> {
-    // Phase 2 will plug in job requirement extraction
+    const processed = jobDescriptionProcessorService.process(
+      jobDescription.rawText
+    );
+
     return {
       ...jobDescription,
-      requiredSkills: jobDescription.requiredSkills ?? [],
-      preferredSkills: jobDescription.preferredSkills ?? [],
+      requiredSkills:
+        processed.requiredSkills.length > 0
+          ? [...processed.requiredSkills]
+          : (jobDescription.requiredSkills ?? []),
+      preferredSkills:
+        processed.preferredSkills.length > 0
+          ? [...processed.preferredSkills]
+          : (jobDescription.preferredSkills ?? []),
+      minExperienceYears:
+        processed.experienceRequirement?.minimumYears ??
+        jobDescription.minExperienceYears,
     };
   }
 }
