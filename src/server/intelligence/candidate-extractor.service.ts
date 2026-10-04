@@ -344,17 +344,12 @@ export class CandidateExtractorService implements ICandidateExtractor {
         continue;
       }
 
-      // 4. Reject job titles
-      if (JOB_TITLE_REGEX.test(cleaned)) {
-        continue;
-      }
-
-      // 5. Direct clean name match
-      if (STRICT_NAME_REGEX.test(cleaned)) {
+      // 4. Direct clean name match (line is exclusively a name)
+      if (STRICT_NAME_REGEX.test(cleaned) && !JOB_TITLE_REGEX.test(cleaned)) {
         return cleaned;
       }
 
-      // 6. Name before delimiter (e.g. "Jane Doe | Software Engineer")
+      // 5. Name before delimiter (e.g. "Jane Doe | Software Engineer")
       if (/[|\u2013\u2014\-]/.test(cleaned)) {
         const firstPart = cleaned.split(/\s*[|\u2013\u2014\-]\s*/)[0].trim();
         if (
@@ -362,6 +357,22 @@ export class CandidateExtractorService implements ICandidateExtractor {
           !JOB_TITLE_REGEX.test(firstPart)
         ) {
           return firstPart;
+        }
+      }
+
+      // 6. Name followed by inline job title without delimiter (e.g. "Jane Doe Senior Engineer")
+      const words = cleaned.split(/\s+/);
+      if (words.length >= 3 && words.length <= 6) {
+        for (let i = 2; i <= Math.min(3, words.length - 1); i++) {
+          const potentialName = words.slice(0, i).join(" ");
+          const remainder = words.slice(i).join(" ");
+          if (
+            STRICT_NAME_REGEX.test(potentialName) &&
+            !JOB_TITLE_REGEX.test(potentialName) &&
+            JOB_TITLE_REGEX.test(remainder)
+          ) {
+            return potentialName;
+          }
         }
       }
     }
