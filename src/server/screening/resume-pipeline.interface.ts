@@ -41,6 +41,29 @@ export interface BatchIngestResult {
 }
 
 /**
+ * Standard response shape for the HTTP resume upload API endpoint.
+ */
+export interface ResumeUploadApiResponse {
+  readonly success: boolean;
+  readonly message: string;
+  readonly totalProcessed: number;
+  readonly successfulCount: number;
+  readonly failedCount: number;
+  readonly results: readonly IngestResumeResult[];
+  readonly warnings: readonly string[];
+}
+
+/**
+ * Standard error response shape for the HTTP resume upload API endpoint.
+ */
+export interface ResumeUploadApiErrorResponse {
+  readonly success: false;
+  readonly error: string;
+  readonly code: string;
+  readonly details?: Record<string, string[]>;
+}
+
+/**
  * Contract for the server-side resume ingestion and processing pipeline.
  */
 export interface IResumePipelineService {
