@@ -1,4 +1,4 @@
-import { RankingResult } from "@/types";
+import { Candidate, RankingResult, ResumeDocument } from "@/types";
 
 export interface UploadedFileItem {
   readonly id: string;
@@ -11,12 +11,23 @@ export interface UploadedFileItem {
   readonly uploadedAt: string;
 }
 
+export interface CandidateProcessingResult {
+  readonly status: "success" | "error";
+  readonly document: ResumeDocument;
+  readonly candidate?: Candidate;
+  readonly warnings: readonly string[];
+  readonly error?: string;
+}
+
 export interface ScreeningWorkflowState {
   readonly jobTitle: string;
   readonly jobDescriptionText: string;
   readonly files: readonly UploadedFileItem[];
   readonly isEvaluating: boolean;
   readonly results: readonly RankingResult[];
+  readonly candidates: readonly Candidate[];
+  readonly candidateResults: readonly CandidateProcessingResult[];
+  readonly warnings: readonly string[];
   readonly generalError: string | null;
   readonly validationErrors: {
     readonly jobDescription?: string;

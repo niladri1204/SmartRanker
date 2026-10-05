@@ -5,6 +5,7 @@ import { useScreeningWorkflow } from "@/features/screening";
 import { JobDescriptionPanel } from "./job-description-panel";
 import { ResumeUploadZone } from "./resume-upload-zone";
 import { EmptyResultsState } from "./empty-results-state";
+import { CandidateResultsList } from "./candidate-results-list";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { APP_CONFIG } from "@/config/app";
@@ -80,7 +81,7 @@ export function DashboardView() {
       <div className="flex flex-col items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:p-5">
         <div className="flex w-full items-center gap-3 sm:w-auto">
           <div className="text-xs text-slate-400">
-            Ready to evaluate:{" "}
+            Ready to screen:{" "}
             <span className="font-semibold text-slate-200">
               {files.length} {files.length === 1 ? "resume" : "resumes"}
             </span>{" "}
@@ -106,7 +107,7 @@ export function DashboardView() {
           <Button
             variant="primary"
             size="lg"
-            disabled={!hasValidInputs}
+            disabled={!hasValidInputs || state.isEvaluating}
             isLoading={state.isEvaluating}
             onClick={triggerRanking}
             className="w-full min-w-[200px] sm:w-auto"
@@ -122,7 +123,7 @@ export function DashboardView() {
             >
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>
-            <span>Rank Candidates</span>
+            <span>Screen Resumes</span>
             {files.length > 0 && (
               <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">
                 {files.length}
@@ -132,8 +133,23 @@ export function DashboardView() {
         </div>
       </div>
 
-      {/* General Notification / Validation banner */}
-      {rankingNotice && (
+      {/* General Error Banner */}
+      {state.generalError && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-300">
+          <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-500/20 text-red-400">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <div className="font-semibold text-red-200">Screening Notice</div>
+            <p className="mt-1 text-xs leading-relaxed text-red-300/90">{state.generalError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Status Notice banner */}
+      {rankingNotice && !state.generalError && (
         <div className="flex items-start gap-3 rounded-xl border border-blue-500/30 bg-blue-950/30 p-4 text-sm text-blue-300">
           <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500/20 text-blue-400">
             <svg
@@ -151,7 +167,7 @@ export function DashboardView() {
             </svg>
           </div>
           <div>
-            <div className="font-semibold text-blue-200">Screening Pipeline Ready</div>
+            <div className="font-semibold text-blue-200">Screening Status</div>
             <p className="mt-1 text-xs leading-relaxed text-blue-300/90">
               {rankingNotice}
             </p>
@@ -159,23 +175,33 @@ export function DashboardView() {
         </div>
       )}
 
-      {/* Results Area (Empty State) */}
+      {/* Results Area */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold tracking-tight text-white">
-              Evaluation & Ranking Results
-            </h2>
-            <Badge variant="outline" className="text-xs">
-              0 Evaluated
-            </Badge>
-          </div>
-        </div>
+        {state.candidateResults.length > 0 ? (
+          <CandidateResultsList
+            results={state.candidateResults}
+            candidates={state.candidates}
+            warnings={state.warnings}
+          />
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold tracking-tight text-white">
+                  Evaluation & Ranking Results
+                </h2>
+                <Badge variant="outline" className="text-xs">
+                  0 Screened
+                </Badge>
+              </div>
+            </div>
 
-        <EmptyResultsState
-          filesCount={files.length}
-          hasJobDescription={Boolean(jobDescriptionText.trim())}
-        />
+            <EmptyResultsState
+              filesCount={files.length}
+              hasJobDescription={Boolean(jobDescriptionText.trim())}
+            />
+          </>
+        )}
       </div>
     </div>
   );
