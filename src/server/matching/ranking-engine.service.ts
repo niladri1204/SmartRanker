@@ -1,54 +1,585 @@
 /**
  * Server-only execution context
+ * Deterministic Baseline Matching and Ranking Engine.
+ * Evaluates structured Candidate profiles against Job Description requirements
+ * using explainable multi-dimensional weighted scoring, non-overlapping experience
+ * calculation, conservative education verification, and deterministic tie-breaking.
  */
-import { Candidate, JobDescription, RankingResult } from "@/types";
-import { IMatchingEngine } from "./matching.interface";
+import {
+  Candidate,
+  CandidateEducation,
+  CandidateExperience,
+  CandidateSkill,
+  ExperienceEvaluation,
+  JobDescription,
+  RankingResult,
+  ScoreBreakdown,
+} from "@/types";
+import {
+  jobDescriptionProcessorService,
+  ProcessedJobDescription,
+} from "../intelligence";
+import { IMatchingEngine, MatchJobInput } from "./matching.interface";
 
 /**
- * Ranking Engine Service Stub.
- * Architectural foundation for candidate ranking (Phase 2).
- * Algorithm intentionally deferred as per requirements.
+ * Baseline dimension weights.
+ * Totaling 100 points across the 4 core dimensions.
  */
+const BASELINE_WEIGHTS = {
+  requiredSkills: 50,
+  experience: 25,
+  preferredSkills: 15,
+  education: 10,
+} as const;
+
+const MONTH_NAMES: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12,
+};
+
+/**
+ * Parses a date string into a deterministic { year, month } representation.
+ */
+export function parseMonthYear(
+  rawStr?: string,
+  isEndDate: boolean = false,
+  isCurrent: boolean = false
+): { year: number; month: number } | null {
+  if (isEndDate && isCurrent) {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  }
+
+  if (!rawStr || typeof rawStr !== "string") {
+    return null;
+  }
+
+  const str = rawStr.trim();
+  if (!str) return null;
+
+  if (isEndDate && /^(present|current|now|ongoing)$/i.test(str)) {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  }
+
+  // 1. Month name + 4-digit year: "Jan 2020", "January, 2020", "Mar. 2022"
+  const monthNameMatch = str.match(
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?,?\s+(\d{4})\b/i
+  );
+  if (monthNameMatch) {
+    const mKey = monthNameMatch[1].toLowerCase().replace(".", "");
+    const month = MONTH_NAMES[mKey] ?? 1;
+    const year = parseInt(monthNameMatch[2], 10);
+    if (year >= 1950 && year <= 2050) {
+      return { year, month };
+    }
+  }
+
+  // 2. Numerical MM/YYYY or MM-YYYY: "01/2020", "1/2020", "01-2020"
+  const mmYyyyMatch = str.match(/\b(0?[1-9]|1[0-2])[\/\-](\d{4})\b/);
+  if (mmYyyyMatch) {
+    const month = parseInt(mmYyyyMatch[1], 10);
+    const year = parseInt(mmYyyyMatch[2], 10);
+    if (year >= 1950 && year <= 2050) {
+      return { year, month };
+    }
+  }
+
+  // 3. Numerical YYYY/MM or YYYY-MM: "2020-01", "2020/1"
+  const yyyyMmMatch = str.match(/\b(\d{4})[\/\-](0?[1-9]|1[0-2])\b/);
+  if (yyyyMmMatch) {
+    const year = parseInt(yyyyMmMatch[1], 10);
+    const month = parseInt(yyyyMmMatch[2], 10);
+    if (year >= 1950 && year <= 2050) {
+      return { year, month };
+    }
+  }
+
+  // 4. Standalone 4-digit year: "2020"
+  const yearMatch = str.match(/\b(19\d{2}|20\d{2})\b/);
+  if (yearMatch) {
+    const year = parseInt(yearMatch[1], 10);
+    if (year >= 1950 && year <= 2050) {
+      return { year, month: isEndDate ? 12 : 1 };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Calculates total experience in years by merging non-overlapping date intervals.
+ */
+export function deriveExperienceYearsFromIntervals(
+  experiences: readonly CandidateExperience[]
+): number | undefined {
+  if (!experiences || experiences.length === 0) {
+    return undefined;
+  }
+
+  const intervals: Array<[number, number]> = [];
+
+  for (const exp of experiences) {
+    const start = parseMonthYear(exp.startDate, false, false);
+    const end = parseMonthYear(
+      exp.endDate,
+      true,
+      Boolean(exp.isCurrent)
+    );
+
+    if (start && end) {
+      const startIdx = start.year * 12 + start.month;
+      const endIdx = end.year * 12 + end.month;
+      if (startIdx <= endIdx) {
+        intervals.push([startIdx, endIdx]);
+      }
+    }
+  }
+
+  if (intervals.length === 0) {
+    return undefined;
+  }
+
+  // Sort intervals by start month ascending, then end month ascending
+  intervals.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+
+  // Merge overlapping or contiguous intervals
+  const merged: Array<[number, number]> = [];
+  for (const [startIdx, endIdx] of intervals) {
+    if (merged.length === 0) {
+      merged.push([startIdx, endIdx]);
+    } else {
+      const last = merged[merged.length - 1];
+      if (startIdx <= last[1] + 1) {
+        last[1] = Math.max(last[1], endIdx);
+      } else {
+        merged.push([startIdx, endIdx]);
+      }
+    }
+  }
+
+  // Calculate total months across merged non-overlapping intervals
+  const totalMonths = merged.reduce((sum, [s, e]) => sum + (e - s + 1), 0);
+  return Math.round((totalMonths / 12) * 10) / 10;
+}
+
+/**
+ * Returns a numerical degree level hierarchy (0 to 4).
+ */
+export function getDegreeLevel(text: string): number {
+  const lower = text.toLowerCase();
+  if (/\b(ph\.?d|doctorate|doctoral)\b/i.test(lower)) return 4;
+  if (/\b(master'?s?|m\.s\b|m\.a\b|m\.tech|mba|post[- ]?graduate)\b/i.test(lower)) return 3;
+  if (/\b(bachelor'?s?|b\.s\b|b\.a\b|b\.tech|b\.e\b|undergraduate)\b/i.test(lower)) return 2;
+  if (/\b(associate'?s?|a\.s\b|a\.a\b)\b/i.test(lower)) return 1;
+  return 0;
+}
+
+/**
+ * Checks whether candidate education satisfies a specific JD requirement.
+ */
+export function matchesEducationRequirement(
+  req: string,
+  candidateEducation: readonly CandidateEducation[]
+): boolean {
+  if (!candidateEducation || candidateEducation.length === 0) {
+    return false;
+  }
+
+  const reqLower = req.toLowerCase();
+  const reqLevel = getDegreeLevel(reqLower);
+
+  if (reqLevel > 0) {
+    for (const edu of candidateEducation) {
+      const candidateLevel = getDegreeLevel(edu.degree || "");
+      if (candidateLevel >= reqLevel) {
+        return true;
+      }
+    }
+  }
+
+  for (const edu of candidateEducation) {
+    const degLower = (edu.degree || "").toLowerCase();
+    const fieldLower = (edu.fieldOfStudy || "").toLowerCase();
+    if (degLower && reqLower.includes(degLower)) {
+      return true;
+    }
+    if (fieldLower && fieldLower.length > 2 && reqLower.includes(fieldLower)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+interface ParsedJobCriteria {
+  readonly requiredSkills: readonly string[];
+  readonly preferredSkills: readonly string[];
+  readonly minExperienceYears?: number;
+  readonly educationRequirements: readonly string[];
+  readonly explicitRequirements: readonly string[];
+}
+
 export class RankingEngineService implements IMatchingEngine {
+  /**
+   * Normalizes JobDescription or ProcessedJobDescription into structured criteria.
+   */
+  private extractJobCriteria(job: MatchJobInput): ParsedJobCriteria {
+    // 1. ProcessedJobDescription instance
+    if ("normalizedText" in job && Array.isArray(job.educationRequirements)) {
+      return {
+        requiredSkills: job.requiredSkills ?? [],
+        preferredSkills: job.preferredSkills ?? [],
+        minExperienceYears: job.experienceRequirement?.minimumYears,
+        educationRequirements: job.educationRequirements ?? [],
+        explicitRequirements: job.explicitRequirements ?? [],
+      };
+    }
+
+    // 2. Standard JobDescription
+    const jd = job as JobDescription;
+    const requiredSkills = jd.requiredSkills ?? [];
+    const preferredSkills = jd.preferredSkills ?? [];
+    let minExperienceYears = jd.minExperienceYears;
+    let educationRequirements: string[] = [];
+    let explicitRequirements: string[] = [];
+
+    if (jd.rawText && (requiredSkills.length === 0 || educationRequirements.length === 0)) {
+      try {
+        const processed = jobDescriptionProcessorService.process(jd.rawText);
+        educationRequirements = Array.from(processed.educationRequirements);
+        explicitRequirements = Array.from(processed.explicitRequirements);
+        if (minExperienceYears === undefined) {
+          minExperienceYears = processed.experienceRequirement?.minimumYears;
+        }
+        if (requiredSkills.length === 0 && processed.requiredSkills.length > 0) {
+          return {
+            requiredSkills: processed.requiredSkills,
+            preferredSkills:
+              preferredSkills.length > 0 ? preferredSkills : processed.preferredSkills,
+            minExperienceYears,
+            educationRequirements,
+            explicitRequirements,
+          };
+        }
+      } catch {
+        // Fallback gracefully
+      }
+    }
+
+    return {
+      requiredSkills,
+      preferredSkills,
+      minExperienceYears,
+      educationRequirements,
+      explicitRequirements,
+    };
+  }
+
+  /**
+   * Evaluates an individual candidate against job criteria.
+   */
   public async evaluateMatch(
-    job: JobDescription,
+    job: MatchJobInput,
     candidate: Candidate
   ): Promise<RankingResult> {
-    // Phase 2 will implement semantic matching / scoring
+    const criteria = this.extractJobCriteria(job);
+    const warnings: string[] = [];
+    const explanations: string[] = [];
+
+    // --- 1. Skills Matching ---
+    const candidateSkillSet = new Set(
+      (candidate.skills ?? []).map((s) => s.name.trim().toLowerCase()).filter(Boolean)
+    );
+
+    const matchedRequiredSkills: string[] = [];
+    const missingRequiredSkills: string[] = [];
+    for (const req of criteria.requiredSkills) {
+      if (candidateSkillSet.has(req.trim().toLowerCase())) {
+        matchedRequiredSkills.push(req);
+      } else {
+        missingRequiredSkills.push(req);
+      }
+    }
+
+    const matchedPreferredSkills: string[] = [];
+    for (const pref of criteria.preferredSkills) {
+      if (candidateSkillSet.has(pref.trim().toLowerCase())) {
+        matchedPreferredSkills.push(pref);
+      }
+    }
+
+    const hasRequiredSkillsDim = criteria.requiredSkills.length > 0;
+    const requiredSkillScore = hasRequiredSkillsDim
+      ? Math.round((matchedRequiredSkills.length / criteria.requiredSkills.length) * 1000) / 10
+      : 100;
+
+    const hasPreferredSkillsDim = criteria.preferredSkills.length > 0;
+    const preferredSkillScore = hasPreferredSkillsDim
+      ? Math.round((matchedPreferredSkills.length / criteria.preferredSkills.length) * 1000) / 10
+      : 100;
+
+    if (hasRequiredSkillsDim) {
+      explanations.push(
+        `Matched ${matchedRequiredSkills.length}/${criteria.requiredSkills.length} required skills (${Math.round(requiredSkillScore)}%).`
+      );
+      for (const missing of missingRequiredSkills.slice(0, 3)) {
+        explanations.push(`Missing required skill: ${missing}`);
+      }
+      if (missingRequiredSkills.length > 3) {
+        explanations.push(`+${missingRequiredSkills.length - 3} more missing required skills.`);
+      }
+    } else {
+      explanations.push("No required skills specified in job description.");
+    }
+
+    if (hasPreferredSkillsDim) {
+      if (matchedPreferredSkills.length > 0) {
+        explanations.push(
+          `Matched ${matchedPreferredSkills.length}/${criteria.preferredSkills.length} preferred skills (${matchedPreferredSkills.join(", ")}).`
+        );
+      } else {
+        explanations.push(`Matched 0/${criteria.preferredSkills.length} preferred skills.`);
+      }
+    }
+
+    // --- 2. Experience Matching ---
+    let candidateYears: number | undefined = undefined;
+    if (
+      typeof candidate.totalExperienceYears === "number" &&
+      !isNaN(candidate.totalExperienceYears) &&
+      candidate.totalExperienceYears >= 0
+    ) {
+      candidateYears = candidate.totalExperienceYears;
+    } else {
+      candidateYears = deriveExperienceYearsFromIntervals(candidate.experiences ?? []);
+    }
+
+    const hasExpRequirement =
+      criteria.minExperienceYears !== undefined && criteria.minExperienceYears !== null;
+    let hasExperienceDim = false;
+    let experienceScore = 100;
+    let experienceEvaluation: ExperienceEvaluation;
+
+    if (!hasExpRequirement) {
+      experienceEvaluation = {
+        status: "unavailable",
+        details: "No minimum experience requirement specified in job description.",
+      };
+      explanations.push("No minimum experience requirement specified in job description.");
+    } else if (candidateYears === undefined) {
+      experienceEvaluation = {
+        requiredYears: criteria.minExperienceYears,
+        status: "unavailable",
+        details:
+          "Candidate experience duration could not be deterministically determined from resume dates.",
+      };
+      warnings.push(
+        "Experience dimension excluded from scoring due to unparseable employment dates."
+      );
+      explanations.push(
+        "Experience duration could not be deterministically determined from resume dates."
+      );
+    } else {
+      hasExperienceDim = true;
+      const minYears = criteria.minExperienceYears!;
+      const meets = minYears === 0 || candidateYears >= minYears;
+      experienceScore =
+        minYears === 0 || candidateYears >= minYears
+          ? 100
+          : Math.round((candidateYears / minYears) * 1000) / 10;
+
+      experienceEvaluation = {
+        requiredYears: minYears,
+        candidateYears,
+        meetsRequirement: meets,
+        status: meets ? "meets" : "below",
+        details: meets
+          ? `Candidate meets or exceeds minimum requirement of ${minYears} yr(s) with ${candidateYears} yr(s).`
+          : `Candidate has ${candidateYears} yr(s), below the minimum requirement of ${minYears} yr(s).`,
+      };
+
+      explanations.push(
+        meets
+          ? `Meets minimum experience requirement (${candidateYears} yrs vs ${minYears} yrs required).`
+          : `Below minimum experience requirement (${candidateYears} yrs vs ${minYears} yrs required).`
+      );
+    }
+
+    // --- 3. Education Matching ---
+    const hasEducationRequirements = criteria.educationRequirements.length > 0;
+    let hasEducationDim = false;
+    let educationScore = 100;
+    const matchedEducationRequirements: string[] = [];
+
+    if (hasEducationRequirements) {
+      hasEducationDim = true;
+      for (const req of criteria.educationRequirements) {
+        if (matchesEducationRequirement(req, candidate.education ?? [])) {
+          matchedEducationRequirements.push(req);
+        }
+      }
+
+      educationScore =
+        criteria.educationRequirements.length > 0
+          ? Math.round(
+              (matchedEducationRequirements.length / criteria.educationRequirements.length) * 1000
+            ) / 10
+          : 100;
+
+      if (matchedEducationRequirements.length > 0) {
+        explanations.push(
+          `Education requirement matched (${matchedEducationRequirements.join(", ")}).`
+        );
+      } else {
+        explanations.push("Education requirement not met or unverified.");
+      }
+    } else {
+      explanations.push("No explicit education requirement specified in job description.");
+    }
+
+    // --- 4. Explicit Requirements Notice ---
+    if (criteria.explicitRequirements.length > 0) {
+      warnings.push(
+        "Explicit operational requirements present in job description could not be evaluated from resume profile."
+      );
+    }
+
+    // --- 5. Overall Weighted Scoring with Proportional Redistribution ---
+    const evaluableDimensions = [
+      {
+        name: "requiredSkills",
+        weight: BASELINE_WEIGHTS.requiredSkills,
+        score: requiredSkillScore,
+        active: hasRequiredSkillsDim,
+      },
+      {
+        name: "experience",
+        weight: BASELINE_WEIGHTS.experience,
+        score: experienceScore,
+        active: hasExperienceDim,
+      },
+      {
+        name: "preferredSkills",
+        weight: BASELINE_WEIGHTS.preferredSkills,
+        score: preferredSkillScore,
+        active: hasPreferredSkillsDim,
+      },
+      {
+        name: "education",
+        weight: BASELINE_WEIGHTS.education,
+        score: educationScore,
+        active: hasEducationDim,
+      },
+    ].filter((d) => d.active);
+
+    const totalWeight = evaluableDimensions.reduce((sum, d) => sum + d.weight, 0);
+
+    let rawOverallScore = 0;
+    if (totalWeight > 0) {
+      rawOverallScore = evaluableDimensions.reduce(
+        (sum, d) => sum + d.score * (d.weight / totalWeight),
+        0
+      );
+    }
+
+    const overallScore = Math.min(100, Math.max(0, Math.round(rawOverallScore * 10) / 10));
+
+    const scoreBreakdown: ScoreBreakdown = {
+      requiredSkillScore,
+      preferredSkillScore,
+      experienceScore,
+      educationScore,
+      skillsMatch: requiredSkillScore,
+      experienceMatch: experienceScore,
+      semanticRelevance: preferredSkillScore,
+    };
+
+    const summaryNotes = explanations.slice(0, 2).join(" ");
+
     return {
       id: `rank_${candidate.id}_${Date.now()}`,
       candidateId: candidate.id,
       candidateName: candidate.fullName,
       documentId: candidate.documentId,
-      score: 0,
+      candidate,
+      score: overallScore,
+      overallScore,
       rank: 1,
-      matchingSkills: [],
-      missingSkills: job.requiredSkills ?? [],
-      scoreBreakdown: {
-        skillsMatch: 0,
-        experienceMatch: 0,
-        semanticRelevance: 0,
-      },
-      summaryNotes: "Evaluation pending Phase 2 algorithm execution.",
+      matchingSkills: [...matchedRequiredSkills, ...matchedPreferredSkills],
+      missingSkills: missingRequiredSkills,
+      matchedRequiredSkills,
+      missingRequiredSkills,
+      matchedPreferredSkills,
+      matchedEducationRequirements,
+      experienceEvaluation,
+      scoreBreakdown,
+      explanations,
+      summaryNotes,
+      warnings,
       evaluatedAt: new Date().toISOString(),
     };
   }
 
+  /**
+   * Evaluates and ranks a batch of candidates using deterministic multi-tier tie-breaking.
+   */
   public async rankCandidates(
-    job: JobDescription,
+    job: MatchJobInput,
     candidates: Candidate[]
   ): Promise<RankingResult[]> {
-    // Phase 2 will implement batch similarity, vector ranking, or hybrid TF-IDF/semantic scoring
+    if (!candidates || candidates.length === 0) {
+      return [];
+    }
+
     const results = await Promise.all(
       candidates.map((candidate) => this.evaluateMatch(job, candidate))
     );
 
-    return results
-      .sort((a, b) => b.score - a.score)
-      .map((res, index) => ({
-        ...res,
-        rank: index + 1,
-      }));
+    // Deterministic Sorting & Tie-Breaking:
+    // 1. Higher overall score descending
+    // 2. Higher required-skill score descending
+    // 3. Higher experience score descending
+    // 4. Candidate full name ascending (case-insensitive)
+    results.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      if (b.scoreBreakdown.requiredSkillScore !== a.scoreBreakdown.requiredSkillScore) {
+        return b.scoreBreakdown.requiredSkillScore - a.scoreBreakdown.requiredSkillScore;
+      }
+      if (b.scoreBreakdown.experienceScore !== a.scoreBreakdown.experienceScore) {
+        return b.scoreBreakdown.experienceScore - a.scoreBreakdown.experienceScore;
+      }
+      return a.candidateName.localeCompare(b.candidateName);
+    });
+
+    return results.map((res, index) => ({
+      ...res,
+      rank: index + 1,
+    }));
   }
 }
 

@@ -102,10 +102,22 @@ export interface JobDescription {
   updatedAt?: string;
 }
 
+export interface ExperienceEvaluation {
+  requiredYears?: number;
+  candidateYears?: number;
+  meetsRequirement?: boolean;
+  status: "meets" | "below" | "unavailable";
+  details: string;
+}
+
 export interface ScoreBreakdown {
-  skillsMatch: number;
-  experienceMatch: number;
-  semanticRelevance: number;
+  requiredSkillScore: number;
+  preferredSkillScore: number;
+  experienceScore: number;
+  educationScore: number;
+  skillsMatch?: number;
+  experienceMatch?: number;
+  semanticRelevance?: number;
 }
 
 export interface RankingResult {
@@ -113,11 +125,20 @@ export interface RankingResult {
   candidateId: string;
   candidateName: string;
   documentId: string;
-  score: number; // 0 to 1 scale or 0 to 100
+  candidate?: Candidate;
+  score: number; // 0 to 100 overall score
+  overallScore?: number; // alias for score
   rank: number;
   matchingSkills: string[];
   missingSkills: string[];
-  scoreBreakdown?: ScoreBreakdown;
+  matchedRequiredSkills: string[];
+  missingRequiredSkills: string[];
+  matchedPreferredSkills: string[];
+  matchedEducationRequirements: string[];
+  experienceEvaluation?: ExperienceEvaluation;
+  scoreBreakdown: ScoreBreakdown;
+  explanations?: string[];
   summaryNotes?: string;
+  warnings?: string[];
   evaluatedAt: string;
 }
