@@ -168,6 +168,22 @@ export interface SkillComparisonResult {
   readonly matchScore: number;
 }
 
+export interface RankingWeightsInput {
+  readonly requiredSkillsWeight?: number;
+  readonly semanticSimilarityWeight?: number;
+  readonly experienceWeight?: number;
+  readonly preferredSkillsWeight?: number;
+  readonly educationWeight?: number;
+}
+
+export interface RankingWeights {
+  readonly requiredSkillsWeight: number;
+  readonly semanticSimilarityWeight: number;
+  readonly experienceWeight: number;
+  readonly preferredSkillsWeight: number;
+  readonly educationWeight: number;
+}
+
 export interface ScoreBreakdown {
   requiredSkillScore: number;
   preferredSkillScore: number;
@@ -201,7 +217,8 @@ export interface RankingResult {
   semanticProvider?: string;
   semanticModel?: string;
 semanticAvailability?: SemanticAvailability;
-  skillMatches?: readonly SkillMatchResult[];
+skillMatches?: readonly SkillMatchResult[];
+  appliedWeights?: RankingWeights;
   scoreBreakdown: ScoreBreakdown;
   explanations?: string[];
   summaryNotes?: string;

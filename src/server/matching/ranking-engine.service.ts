@@ -31,6 +31,7 @@ import { calculateSimilarity } from "./cosine-similarity";
 import { semanticTextBuilderService } from "./semantic-text-builder";
 import { openAiEmbeddingProvider } from "./openai-embedding.provider";
 import { skillTaxonomyService } from "./skill-taxonomy.service";
+import { DEFAULT_RANKING_WEIGHTS, RankingWeights, RankingWeightsInput, validateRankingWeights } from "./ranking-weights";
 
 /**
  * Baseline dimension weights.
@@ -261,10 +262,12 @@ interface ParsedJobCriteria {
 
 export interface RankingEngineOptions {
   readonly embeddingProvider?: IEmbeddingProvider | null;
+  readonly rankingWeights?: RankingWeightsInput;
 }
 
 export interface EvaluateMatchOptions {
   readonly embeddingProvider?: IEmbeddingProvider | null;
+  readonly rankingWeights?: RankingWeightsInput;
   readonly jobEmbedding?: EmbeddingVector;
   readonly candidateEmbedding?: EmbeddingVector;
   readonly semanticError?: string;
@@ -273,12 +276,15 @@ export interface EvaluateMatchOptions {
 
 export class RankingEngineService implements IMatchingEngine {
   private readonly defaultEmbeddingProvider: IEmbeddingProvider | null;
+  private readonly defaultRankingWeights: RankingWeights;
 
   constructor(options: RankingEngineOptions = {}) {
     this.defaultEmbeddingProvider =
       options.embeddingProvider !== undefined
         ? options.embeddingProvider
         : openAiEmbeddingProvider;
+
+    this.defaultRankingWeights = validateRankingWeights(options.rankingWeights);
   }
 
   /**
@@ -355,6 +361,11 @@ export class RankingEngineService implements IMatchingEngine {
       options?.embeddingProvider !== undefined
         ? options.embeddingProvider
         : this.defaultEmbeddingProvider;
+
+    const weights =
+      options?.rankingWeights !== undefined
+        ? validateRankingWeights(options.rankingWeights)
+        : this.defaultRankingWeights;
 
     // --- 1. Skills Matching (with Canonical Taxonomy) ---
     const requiredComparison = skillTaxonomyService.compareSkills(
@@ -614,31 +625,31 @@ export class RankingEngineService implements IMatchingEngine {
     const evaluableDimensions = [
       {
         name: "requiredSkills",
-        weight: BASELINE_WEIGHTS.requiredSkills,
+        weight: weights.requiredSkillsWeight,
         score: requiredSkillScore,
         active: hasRequiredSkillsDim,
       },
       {
         name: "semantic",
-        weight: BASELINE_WEIGHTS.semantic,
+        weight: weights.semanticSimilarityWeight,
         score: semanticEvaluation.normalizedScore ?? 0,
         active: hasSemanticDim,
       },
       {
         name: "experience",
-        weight: BASELINE_WEIGHTS.experience,
+        weight: weights.experienceWeight,
         score: experienceScore,
         active: hasExperienceDim,
       },
       {
         name: "preferredSkills",
-        weight: BASELINE_WEIGHTS.preferredSkills,
+        weight: weights.preferredSkillsWeight,
         score: preferredSkillScore,
         active: hasPreferredSkillsDim,
       },
       {
         name: "education",
-        weight: BASELINE_WEIGHTS.education,
+        weight: weights.educationWeight,
         score: educationScore,
         active: hasEducationDim,
       },
@@ -686,6 +697,7 @@ export class RankingEngineService implements IMatchingEngine {
       matchedEducationRequirements,
       experienceEvaluation,
       skillMatches: allSkillMatches,
+      appliedWeights: weights,
       semanticEvaluation,
       semanticScore: hasSemanticDim ? semanticEvaluation.normalizedScore : undefined,
       semanticSimilarity: hasSemanticDim ? semanticEvaluation.rawCosineSimilarity : undefined,
@@ -716,6 +728,11 @@ export class RankingEngineService implements IMatchingEngine {
       options?.embeddingProvider !== undefined
         ? options.embeddingProvider
         : this.defaultEmbeddingProvider;
+
+    const weights =
+      options?.rankingWeights !== undefined
+        ? validateRankingWeights(options.rankingWeights)
+        : this.defaultRankingWeights;
 
     // Batch embedding preparation
     let jobVector: EmbeddingVector | undefined = undefined;
@@ -772,6 +789,7 @@ export class RankingEngineService implements IMatchingEngine {
       candidates.map((candidate, idx) =>
         this.evaluateMatch(job, candidate, {
           embeddingProvider: provider,
+          rankingWeights: weights,
           jobEmbedding: jobVector,
           candidateEmbedding: candidateVectors[idx],
           semanticError: semanticBatchError,
