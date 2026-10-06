@@ -11,6 +11,8 @@ export interface AppEnvConfig {
   readonly maxUploadSizeBytes: number;
   readonly maxResumeFiles: number;
   readonly allowedMimeTypes: readonly string[];
+  readonly openAiApiKey?: string;
+  readonly openAiEmbeddingModel: string;
 }
 
 function getEnvNumber(key: string, defaultValue: number): number {
@@ -37,4 +39,6 @@ export const envConfig: AppEnvConfig = Object.freeze({
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "text/plain",
   ]),
+  openAiApiKey: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.trim() : undefined,
+  openAiEmbeddingModel: getEnvString("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small").trim(),
 });
