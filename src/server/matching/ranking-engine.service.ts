@@ -1,9 +1,10 @@
 /**
  * Server-only execution context
- * Deterministic Baseline Matching and Ranking Engine.
+ * Deterministic Baseline Matching and Hybrid Ranking Engine.
  * Evaluates structured Candidate profiles against Job Description requirements
  * using explainable multi-dimensional weighted scoring, non-overlapping experience
- * calculation, conservative education verification, and deterministic tie-breaking.
+ * calculation, conservative education verification, semantic embedding similarity,
+ * and deterministic multi-tier tie-breaking.
  */
 import {
   Candidate,
@@ -14,22 +15,37 @@ import {
   JobDescription,
   RankingResult,
   ScoreBreakdown,
+  SemanticAvailability,
+  SemanticScore,
 } from "@/types";
 import {
   jobDescriptionProcessorService,
   ProcessedJobDescription,
 } from "../intelligence";
 import { IMatchingEngine, MatchJobInput } from "./matching.interface";
+import {
+  EmbeddingVector,
+  IEmbeddingProvider,
+} from "./semantic.interface";
+import { calculateSimilarity } from "./cosine-similarity";
+import { semanticTextBuilderService } from "./semantic-text-builder";
+import { openAiEmbeddingProvider } from "./openai-embedding.provider";
 
 /**
  * Baseline dimension weights.
- * Totaling 100 points across the 4 core dimensions.
+ * Totaling 100 points across the 5 dimensions:
+ * - Required skills: 40%
+ * - Semantic similarity: 25%
+ * - Experience: 20%
+ * - Preferred skills: 10%
+ * - Education: 5%
  */
 const BASELINE_WEIGHTS = {
-  requiredSkills: 50,
-  experience: 25,
-  preferredSkills: 15,
-  education: 10,
+  requiredSkills: 40,
+  semantic: 25,
+  experience: 20,
+  preferredSkills: 10,
+  education: 5,
 } as const;
 
 const MONTH_NAMES: Record<string, number> = {
@@ -242,7 +258,28 @@ interface ParsedJobCriteria {
   readonly explicitRequirements: readonly string[];
 }
 
+export interface RankingEngineOptions {
+  readonly embeddingProvider?: IEmbeddingProvider | null;
+}
+
+export interface EvaluateMatchOptions {
+  readonly embeddingProvider?: IEmbeddingProvider | null;
+  readonly jobEmbedding?: EmbeddingVector;
+  readonly candidateEmbedding?: EmbeddingVector;
+  readonly semanticError?: string;
+  readonly semanticStatus?: SemanticAvailability;
+}
+
 export class RankingEngineService implements IMatchingEngine {
+  private readonly defaultEmbeddingProvider: IEmbeddingProvider | null;
+
+  constructor(options: RankingEngineOptions = {}) {
+    this.defaultEmbeddingProvider =
+      options.embeddingProvider !== undefined
+        ? options.embeddingProvider
+        : openAiEmbeddingProvider;
+  }
+
   /**
    * Normalizes JobDescription or ProcessedJobDescription into structured criteria.
    */
@@ -264,6 +301,9 @@ export class RankingEngineService implements IMatchingEngine {
     const preferredSkills = jd.preferredSkills ?? [];
     let minExperienceYears = jd.minExperienceYears;
     let educationRequirements: string[] = [];
+    if ("educationRequirements" in job && Array.isArray((job as { educationRequirements?: unknown }).educationRequirements)) {
+      educationRequirements = Array.from((job as unknown as { educationRequirements: readonly string[] }).educationRequirements);
+    }
     let explicitRequirements: string[] = [];
 
     if (jd.rawText && (requiredSkills.length === 0 || educationRequirements.length === 0)) {
@@ -303,11 +343,17 @@ export class RankingEngineService implements IMatchingEngine {
    */
   public async evaluateMatch(
     job: MatchJobInput,
-    candidate: Candidate
+    candidate: Candidate,
+    options?: EvaluateMatchOptions
   ): Promise<RankingResult> {
     const criteria = this.extractJobCriteria(job);
     const warnings: string[] = [];
     const explanations: string[] = [];
+
+    const provider =
+      options?.embeddingProvider !== undefined
+        ? options.embeddingProvider
+        : this.defaultEmbeddingProvider;
 
     // --- 1. Skills Matching ---
     const candidateSkillSet = new Set(
@@ -460,20 +506,112 @@ export class RankingEngineService implements IMatchingEngine {
       explanations.push("No explicit education requirement specified in job description.");
     }
 
-    // --- 4. Explicit Requirements Notice ---
+    // --- 4. Semantic Similarity Matching ---
+    let semanticEvaluation: SemanticScore;
+
+    if (options?.semanticError || options?.semanticStatus === "failed") {
+      semanticEvaluation = {
+        status: "failed",
+        providerId: provider?.providerId,
+        modelName: provider?.modelName,
+        reason: options.semanticError ?? "Semantic embedding evaluation failed.",
+      };
+    } else if (options?.jobEmbedding && options?.candidateEmbedding) {
+      const similarity = calculateSimilarity(
+        options.jobEmbedding,
+        options.candidateEmbedding
+      );
+      const normalizedScore = Math.round(similarity.normalizedScore * 1000) / 10;
+      semanticEvaluation = {
+        rawCosineSimilarity: Math.round(similarity.score * 10000) / 10000,
+        normalizedScore,
+        similarityScore: Math.round(similarity.normalizedScore * 1000) / 1000,
+        providerId: provider?.providerId,
+        modelName: provider?.modelName,
+        status: "available",
+      };
+    } else if (provider) {
+      const jobText = semanticTextBuilderService.buildJobText(job);
+      const candidateText = semanticTextBuilderService.buildCandidateText(candidate);
+
+      if (!jobText || jobText.trim().length === 0) {
+        semanticEvaluation = {
+          status: "unavailable",
+          providerId: provider.providerId,
+          modelName: provider.modelName,
+          reason: "Job description has insufficient text for semantic evaluation.",
+        };
+      } else if (!candidateText || candidateText.trim().length === 0) {
+        semanticEvaluation = {
+          status: "unavailable",
+          providerId: provider.providerId,
+          modelName: provider.modelName,
+          reason: "Candidate profile has insufficient text for semantic evaluation.",
+        };
+      } else {
+        try {
+          const [jVec, cVec] = await Promise.all([
+            provider.embed(jobText),
+            provider.embed(candidateText),
+          ]);
+          const similarity = calculateSimilarity(jVec, cVec);
+          const normalizedScore = Math.round(similarity.normalizedScore * 1000) / 10;
+          semanticEvaluation = {
+            rawCosineSimilarity: Math.round(similarity.score * 10000) / 10000,
+            normalizedScore,
+            similarityScore: Math.round(similarity.normalizedScore * 1000) / 1000,
+            providerId: provider.providerId,
+            modelName: provider.modelName,
+            status: "available",
+          };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          semanticEvaluation = {
+            status: "failed",
+            providerId: provider.providerId,
+            modelName: provider.modelName,
+            reason: msg,
+          };
+        }
+      }
+    } else {
+      semanticEvaluation = {
+        status: "unavailable",
+        reason: "No semantic embedding provider is configured.",
+      };
+    }
+
+    const hasSemanticDim =
+      semanticEvaluation.status === "available" &&
+      typeof semanticEvaluation.normalizedScore === "number";
+
+    if (hasSemanticDim) {
+      explanations.push(`Semantic similarity: ${semanticEvaluation.normalizedScore}%.`);
+    } else {
+      warnings.push("Semantic scoring unavailable; deterministic criteria used.");
+      explanations.push("Semantic scoring unavailable; deterministic criteria used.");
+    }
+
+    // --- 5. Explicit Requirements Notice ---
     if (criteria.explicitRequirements.length > 0) {
       warnings.push(
         "Explicit operational requirements present in job description could not be evaluated from resume profile."
       );
     }
 
-    // --- 5. Overall Weighted Scoring with Proportional Redistribution ---
+    // --- 6. Hybrid Weighted Scoring with Proportional Redistribution ---
     const evaluableDimensions = [
       {
         name: "requiredSkills",
         weight: BASELINE_WEIGHTS.requiredSkills,
         score: requiredSkillScore,
         active: hasRequiredSkillsDim,
+      },
+      {
+        name: "semantic",
+        weight: BASELINE_WEIGHTS.semantic,
+        score: semanticEvaluation.normalizedScore ?? 0,
+        active: hasSemanticDim,
       },
       {
         name: "experience",
@@ -512,9 +650,10 @@ export class RankingEngineService implements IMatchingEngine {
       preferredSkillScore,
       experienceScore,
       educationScore,
+      semanticScore: hasSemanticDim ? semanticEvaluation.normalizedScore : undefined,
       skillsMatch: requiredSkillScore,
       experienceMatch: experienceScore,
-      semanticRelevance: preferredSkillScore,
+      semanticRelevance: hasSemanticDim ? semanticEvaluation.normalizedScore : undefined,
     };
 
     const summaryNotes = explanations.slice(0, 2).join(" ");
@@ -535,6 +674,12 @@ export class RankingEngineService implements IMatchingEngine {
       matchedPreferredSkills,
       matchedEducationRequirements,
       experienceEvaluation,
+      semanticEvaluation,
+      semanticScore: hasSemanticDim ? semanticEvaluation.normalizedScore : undefined,
+      semanticSimilarity: hasSemanticDim ? semanticEvaluation.rawCosineSimilarity : undefined,
+      semanticProvider: semanticEvaluation.providerId,
+      semanticModel: semanticEvaluation.modelName,
+      semanticAvailability: semanticEvaluation.status,
       scoreBreakdown,
       explanations,
       summaryNotes,
@@ -544,18 +689,83 @@ export class RankingEngineService implements IMatchingEngine {
   }
 
   /**
-   * Evaluates and ranks a batch of candidates using deterministic multi-tier tie-breaking.
+   * Evaluates and ranks a batch of candidates using batch embedding and deterministic multi-tier tie-breaking.
    */
   public async rankCandidates(
     job: MatchJobInput,
-    candidates: Candidate[]
+    candidates: Candidate[],
+    options?: RankingEngineOptions
   ): Promise<RankingResult[]> {
     if (!candidates || candidates.length === 0) {
       return [];
     }
 
+    const provider =
+      options?.embeddingProvider !== undefined
+        ? options.embeddingProvider
+        : this.defaultEmbeddingProvider;
+
+    // Batch embedding preparation
+    let jobVector: EmbeddingVector | undefined = undefined;
+    const candidateVectors: (EmbeddingVector | undefined)[] = new Array(candidates.length).fill(
+      undefined
+    );
+    let semanticBatchError: string | undefined = undefined;
+    let semanticStatus: SemanticAvailability = "available";
+
+    if (!provider) {
+      semanticStatus = "unavailable";
+      semanticBatchError = "No semantic embedding provider is configured.";
+    } else {
+      const jobText = semanticTextBuilderService.buildJobText(job);
+      if (!jobText || jobText.trim().length === 0) {
+        semanticStatus = "unavailable";
+        semanticBatchError = "Job description has insufficient text for semantic evaluation.";
+      } else {
+        const candidateTexts = candidates.map((cand) =>
+          semanticTextBuilderService.buildCandidateText(cand)
+        );
+
+        // Identify non-empty candidate texts to batch embed
+        const nonIndices: number[] = [];
+        const nonTexts: string[] = [];
+        for (let i = 0; i < candidateTexts.length; i++) {
+          if (candidateTexts[i].trim().length > 0) {
+            nonIndices.push(i);
+            nonTexts.push(candidateTexts[i]);
+          }
+        }
+
+        try {
+          if (nonTexts.length > 0) {
+            const [jVec, cVecs] = await Promise.all([
+              provider.embed(jobText),
+              provider.embedBatch(nonTexts),
+            ]);
+            jobVector = jVec;
+            for (let b = 0; b < cVecs.length; b++) {
+              candidateVectors[nonIndices[b]] = cVecs[b];
+            }
+          } else {
+            jobVector = await provider.embed(jobText);
+          }
+        } catch (err) {
+          semanticStatus = "failed";
+          semanticBatchError = err instanceof Error ? err.message : String(err);
+        }
+      }
+    }
+
     const results = await Promise.all(
-      candidates.map((candidate) => this.evaluateMatch(job, candidate))
+      candidates.map((candidate, idx) =>
+        this.evaluateMatch(job, candidate, {
+          embeddingProvider: provider,
+          jobEmbedding: jobVector,
+          candidateEmbedding: candidateVectors[idx],
+          semanticError: semanticBatchError,
+          semanticStatus: candidateVectors[idx] ? "available" : semanticStatus,
+        })
+      )
     );
 
     // Deterministic Sorting & Tie-Breaking:

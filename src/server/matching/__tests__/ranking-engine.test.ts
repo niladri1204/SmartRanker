@@ -55,10 +55,10 @@ describe("Phase 2.10: Deterministic Matching & Ranking Engine", () => {
     expect(result.matchedPreferredSkills).toEqual(["Docker"]);
     expect(result.scoreBreakdown.preferredSkillScore).toBe(50);
 
-    // Weight redistribution: only Required (50) and Preferred (15) are active (total 65)
-    // overall = (66.7 * (50/65)) + (50 * (15/65)) = 51.307 + 11.538 = 62.8
-    expect(result.score).toBe(62.8);
-    expect(result.overallScore).toBe(62.8);
+    // Weight redistribution: only Required (40) and Preferred (10) are active (total 50)
+    // overall = (66.7 * (40/50)) + (50 * (10/50)) = 53.36 + 10.0 = 63.36 -> 63.4
+    expect(result.score).toBe(63.4);
+    expect(result.overallScore).toBe(63.4);
     expect(result.explanations).toContain("Matched 2/3 required skills (67%).");
     expect(result.explanations).toContain("Missing required skill: Node.js");
   });

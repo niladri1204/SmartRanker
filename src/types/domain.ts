@@ -110,11 +110,24 @@ export interface ExperienceEvaluation {
   details: string;
 }
 
+export type SemanticAvailability = "available" | "unavailable" | "failed";
+
+export interface SemanticScore {
+  readonly rawCosineSimilarity?: number; // raw cosine similarity in [-1, 1]
+  readonly normalizedScore?: number; // normalized score in [0, 100]
+  readonly similarityScore?: number; // normalized similarity in [0, 1]
+  readonly providerId?: string;
+  readonly modelName?: string;
+  readonly status: SemanticAvailability;
+  readonly reason?: string;
+}
+
 export interface ScoreBreakdown {
   requiredSkillScore: number;
   preferredSkillScore: number;
   experienceScore: number;
   educationScore: number;
+  semanticScore?: number; // 0-100 scale when semantic scoring is available
   skillsMatch?: number;
   experienceMatch?: number;
   semanticRelevance?: number;
@@ -136,6 +149,12 @@ export interface RankingResult {
   matchedPreferredSkills: string[];
   matchedEducationRequirements: string[];
   experienceEvaluation?: ExperienceEvaluation;
+  semanticEvaluation?: SemanticScore;
+  semanticScore?: number;
+  semanticSimilarity?: number;
+  semanticProvider?: string;
+  semanticModel?: string;
+  semanticAvailability?: SemanticAvailability;
   scoreBreakdown: ScoreBreakdown;
   explanations?: string[];
   summaryNotes?: string;
