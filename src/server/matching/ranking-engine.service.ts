@@ -30,6 +30,7 @@ import {
 import { calculateSimilarity } from "./cosine-similarity";
 import { semanticTextBuilderService } from "./semantic-text-builder";
 import { openAiEmbeddingProvider } from "./openai-embedding.provider";
+import { skillTaxonomyService } from "./skill-taxonomy.service";
 
 /**
  * Baseline dimension weights.
@@ -355,42 +356,46 @@ export class RankingEngineService implements IMatchingEngine {
         ? options.embeddingProvider
         : this.defaultEmbeddingProvider;
 
-    // --- 1. Skills Matching ---
-    const candidateSkillSet = new Set(
-      (candidate.skills ?? []).map((s) => s.name.trim().toLowerCase()).filter(Boolean)
+    // --- 1. Skills Matching (with Canonical Taxonomy) ---
+    const requiredComparison = skillTaxonomyService.compareSkills(
+      candidate.skills ?? [],
+      criteria.requiredSkills
     );
 
-    const matchedRequiredSkills: string[] = [];
-    const missingRequiredSkills: string[] = [];
-    for (const req of criteria.requiredSkills) {
-      if (candidateSkillSet.has(req.trim().toLowerCase())) {
-        matchedRequiredSkills.push(req);
-      } else {
-        missingRequiredSkills.push(req);
-      }
-    }
+    const preferredComparison = skillTaxonomyService.compareSkills(
+      candidate.skills ?? [],
+      criteria.preferredSkills
+    );
 
-    const matchedPreferredSkills: string[] = [];
-    for (const pref of criteria.preferredSkills) {
-      if (candidateSkillSet.has(pref.trim().toLowerCase())) {
-        matchedPreferredSkills.push(pref);
-      }
-    }
+    const matchedRequiredSkills = [...requiredComparison.matchedJobSkills];
+    const missingRequiredSkills = [...requiredComparison.missingJobSkills];
+    const matchedPreferredSkills = [...preferredComparison.matchedJobSkills];
+    const allSkillMatches = [
+      ...requiredComparison.matches,
+      ...preferredComparison.matches,
+    ];
 
     const hasRequiredSkillsDim = criteria.requiredSkills.length > 0;
     const requiredSkillScore = hasRequiredSkillsDim
-      ? Math.round((matchedRequiredSkills.length / criteria.requiredSkills.length) * 1000) / 10
+      ? requiredComparison.matchScore
       : 100;
 
     const hasPreferredSkillsDim = criteria.preferredSkills.length > 0;
     const preferredSkillScore = hasPreferredSkillsDim
-      ? Math.round((matchedPreferredSkills.length / criteria.preferredSkills.length) * 1000) / 10
+      ? preferredComparison.matchScore
       : 100;
 
     if (hasRequiredSkillsDim) {
       explanations.push(
         `Matched ${matchedRequiredSkills.length}/${criteria.requiredSkills.length} required skills (${Math.round(requiredSkillScore)}%).`
       );
+      for (const match of requiredComparison.matches) {
+        if (match.isAliasMatch) {
+          explanations.push(
+            `"${match.candidateSkill}" matched "${match.jobSkill}" via canonical skill "${match.canonicalName}".`
+          );
+        }
+      }
       for (const missing of missingRequiredSkills.slice(0, 3)) {
         explanations.push(`Missing required skill: ${missing}`);
       }
@@ -406,11 +411,17 @@ export class RankingEngineService implements IMatchingEngine {
         explanations.push(
           `Matched ${matchedPreferredSkills.length}/${criteria.preferredSkills.length} preferred skills (${matchedPreferredSkills.join(", ")}).`
         );
+        for (const match of preferredComparison.matches) {
+          if (match.isAliasMatch) {
+            explanations.push(
+              `"${match.candidateSkill}" matched "${match.jobSkill}" via canonical skill "${match.canonicalName}".`
+            );
+          }
+        }
       } else {
         explanations.push(`Matched 0/${criteria.preferredSkills.length} preferred skills.`);
       }
     }
-
     // --- 2. Experience Matching ---
     let candidateYears: number | undefined = undefined;
     if (
@@ -674,6 +685,7 @@ export class RankingEngineService implements IMatchingEngine {
       matchedPreferredSkills,
       matchedEducationRequirements,
       experienceEvaluation,
+      skillMatches: allSkillMatches,
       semanticEvaluation,
       semanticScore: hasSemanticDim ? semanticEvaluation.normalizedScore : undefined,
       semanticSimilarity: hasSemanticDim ? semanticEvaluation.rawCosineSimilarity : undefined,

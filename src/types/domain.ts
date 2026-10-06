@@ -122,6 +122,52 @@ export interface SemanticScore {
   readonly reason?: string;
 }
 
+export type SkillCategory =
+  | "frontend"
+  | "backend"
+  | "database"
+  | "cloud"
+  | "devops"
+  | "programming-language"
+  | "framework"
+  | "api"
+  | "general";
+
+export interface CanonicalSkill {
+  readonly id: string;
+  readonly name: string;
+  readonly category: SkillCategory;
+  readonly aliases: readonly string[];
+  readonly description?: string;
+}
+
+export interface NormalizedSkill {
+  readonly raw: string;
+  readonly canonicalId: string;
+  readonly canonicalName: string;
+  readonly category: SkillCategory;
+  readonly isKnown: boolean;
+  readonly matchedAlias?: string;
+}
+
+export interface SkillMatchResult {
+  readonly candidateSkill: string;
+  readonly jobSkill: string;
+  readonly canonicalId: string;
+  readonly canonicalName: string;
+  readonly isAliasMatch: boolean;
+}
+
+export interface SkillComparisonResult {
+  readonly matches: readonly SkillMatchResult[];
+  readonly matchedJobSkills: readonly string[];
+  readonly missingJobSkills: readonly string[];
+  readonly matchedCandidateSkills: readonly string[];
+  readonly unmatchedCandidateSkills: readonly string[];
+  readonly matchRate: number;
+  readonly matchScore: number;
+}
+
 export interface ScoreBreakdown {
   requiredSkillScore: number;
   preferredSkillScore: number;
@@ -154,7 +200,8 @@ export interface RankingResult {
   semanticSimilarity?: number;
   semanticProvider?: string;
   semanticModel?: string;
-  semanticAvailability?: SemanticAvailability;
+semanticAvailability?: SemanticAvailability;
+  skillMatches?: readonly SkillMatchResult[];
   scoreBreakdown: ScoreBreakdown;
   explanations?: string[];
   summaryNotes?: string;
