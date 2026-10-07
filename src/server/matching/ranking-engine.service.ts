@@ -32,6 +32,7 @@ import { semanticTextBuilderService } from "./semantic-text-builder";
 import { openAiEmbeddingProvider } from "./openai-embedding.provider";
 import { skillTaxonomyService } from "./skill-taxonomy.service";
 import { DEFAULT_RANKING_WEIGHTS, RankingWeights, RankingWeightsInput, validateRankingWeights } from "./ranking-weights";
+import { matchAnalysisService } from "./match-analysis.service";
 
 /**
  * Baseline dimension weights.
@@ -680,7 +681,7 @@ export class RankingEngineService implements IMatchingEngine {
 
     const summaryNotes = explanations.slice(0, 2).join(" ");
 
-    return {
+    const baseResult: RankingResult = {
       id: `rank_${candidate.id}_${Date.now()}`,
       candidateId: candidate.id,
       candidateName: candidate.fullName,
@@ -709,6 +710,17 @@ export class RankingEngineService implements IMatchingEngine {
       summaryNotes,
       warnings,
       evaluatedAt: new Date().toISOString(),
+    };
+
+    const matchAnalysis = matchAnalysisService.analyze(baseResult, {
+      requiredSkills: criteria.requiredSkills,
+      preferredSkills: criteria.preferredSkills,
+      educationRequirements: criteria.educationRequirements,
+    });
+
+    return {
+      ...baseResult,
+      matchAnalysis,
     };
   }
 

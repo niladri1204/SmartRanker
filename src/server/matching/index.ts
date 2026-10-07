@@ -7,3 +7,4 @@ export * from "./mock-embedding.provider";
 export * from "./openai-embedding.provider";
 export * from "./skill-taxonomy.service";
 export * from "./ranking-weights";
+export * from "./match-analysis.service";

@@ -184,6 +184,89 @@ export interface RankingWeights {
   readonly educationWeight: number;
 }
 
+export type MatchStrength = "strong" | "good" | "moderate" | "weak";
+
+export type AttentionFlag =
+  | "missing-required-skills"
+  | "experience-below-required"
+  | "education-mismatch"
+  | "semantic-score-unavailable"
+  | "insufficient-candidate-data";
+
+export interface RequirementEvaluation {
+  readonly requirementType: "required-skill" | "preferred-skill" | "experience" | "education";
+  readonly requirement: string;
+  readonly isSatisfied: boolean;
+  readonly details: string;
+}
+
+export interface SkillGapItem {
+  readonly jdSkill: string;
+  readonly canonicalId: string;
+  readonly canonicalName: string;
+  readonly isMatched: boolean;
+  readonly candidateSkill?: string;
+  readonly isAliasMatch: boolean;
+}
+
+export interface SkillGapSummary {
+  readonly requiredCount: number;
+  readonly requiredMatchedCount: number;
+  readonly requiredMatchRate: number;
+  readonly preferredCount: number;
+  readonly preferredMatchedCount: number;
+  readonly preferredMatchRate: number;
+  readonly missingRequiredSkills: readonly string[];
+  readonly missingPreferredSkills: readonly string[];
+  readonly summaryText: string;
+}
+
+export interface SkillGap {
+  readonly required: readonly SkillGapItem[];
+  readonly preferred: readonly SkillGapItem[];
+  readonly summary: SkillGapSummary;
+}
+
+export interface ExperienceGap {
+  readonly requiredYears?: number;
+  readonly candidateYears?: number;
+  readonly status: "meets" | "partial" | "does-not-meet" | "unavailable";
+  readonly explanation: string;
+}
+
+export interface EducationGap {
+  readonly matchedRequirements: readonly string[];
+  readonly unmatchedRequirements: readonly string[];
+  readonly status: "meets" | "unmatched" | "unavailable";
+  readonly explanation: string;
+}
+
+export interface SemanticGap {
+  readonly status: SemanticAvailability;
+  readonly score?: number;
+  readonly similarity?: number;
+  readonly explanation: string;
+}
+
+export interface MatchExplanation {
+  readonly headline: string;
+  readonly strongestAreas: readonly string[];
+  readonly areasForImprovement: readonly string[];
+  readonly detailedBulletPoints: readonly string[];
+}
+
+export interface MatchGapAnalysis {
+  readonly strength: MatchStrength;
+  readonly overallScore: number;
+  readonly skillGap: SkillGap;
+  readonly experienceGap: ExperienceGap;
+  readonly educationGap: EducationGap;
+  readonly semanticGap: SemanticGap;
+  readonly explanation: MatchExplanation;
+  readonly attentionFlags: readonly AttentionFlag[];
+  readonly analyzedAt: string;
+}
+
 export interface ScoreBreakdown {
   requiredSkillScore: number;
   preferredSkillScore: number;
@@ -218,7 +301,8 @@ export interface RankingResult {
   semanticModel?: string;
 semanticAvailability?: SemanticAvailability;
 skillMatches?: readonly SkillMatchResult[];
-  appliedWeights?: RankingWeights;
+appliedWeights?: RankingWeights;
+  matchAnalysis?: MatchGapAnalysis;
   scoreBreakdown: ScoreBreakdown;
   explanations?: string[];
   summaryNotes?: string;
