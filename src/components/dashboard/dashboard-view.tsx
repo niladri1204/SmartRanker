@@ -181,6 +181,7 @@ export function DashboardView() {
           <CandidateResultsList
             results={state.candidateResults}
             candidates={state.candidates}
+            rankingResults={state.results}
             warnings={state.warnings}
           />
         ) : (

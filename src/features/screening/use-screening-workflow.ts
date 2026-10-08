@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { Candidate } from "@/types";
+import { Candidate, RankingResult } from "@/types";
 import {
   UploadedFileItem,
   ScreeningWorkflowState,
@@ -12,19 +12,27 @@ import {
   validateJobDescriptionInput,
 } from "./screening-validators";
 import { SAMPLE_JOB_PRESETS } from "./sample-jobs";
-import { submitScreeningResumes } from "./screening-api";
+import {
+  submitScreeningResumes,
+  rankScreeningCandidates,
+} from "./screening-api";
 
 export interface UseScreeningWorkflowOptions {
   readonly screeningApi?: typeof submitScreeningResumes;
+  readonly rankApi?: typeof rankScreeningCandidates;
 }
 
 export function useScreeningWorkflow(options: UseScreeningWorkflowOptions = {}) {
-  const { screeningApi = submitScreeningResumes } = options;
+  const {
+    screeningApi = submitScreeningResumes,
+    rankApi = rankScreeningCandidates,
+  } = options;
 
   const [jobTitle, setJobTitle] = useState<string>("");
   const [jobDescriptionText, setJobDescriptionText] = useState<string>("");
   const [files, setFiles] = useState<UploadedFileItem[]>([]);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
+  const [results, setResults] = useState<RankingResult[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [candidateResults, setCandidateResults] = useState<CandidateProcessingResult[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -79,6 +87,7 @@ export function useScreeningWorkflow(options: UseScreeningWorkflowOptions = {}) 
 
   const clearFiles = useCallback(() => {
     setFiles([]);
+    setResults([]);
     setCandidates([]);
     setCandidateResults([]);
     setWarnings([]);
@@ -106,6 +115,7 @@ export function useScreeningWorkflow(options: UseScreeningWorkflowOptions = {}) 
     setJobTitle("");
     setJobDescriptionText("");
     setFiles([]);
+    setResults([]);
     setCandidates([]);
     setCandidateResults([]);
     setWarnings([]);
@@ -145,32 +155,55 @@ export function useScreeningWorkflow(options: UseScreeningWorkflowOptions = {}) 
     setIsEvaluating(true);
 
     try {
-      const response = await screeningApi(files);
+      // Step 1: Upload and extract structured candidate profiles
+      const uploadResponse = await screeningApi(files);
 
-      if (!response.ok) {
-        setGeneralError(response.error);
+      if (!uploadResponse.ok) {
+        setGeneralError(uploadResponse.error);
         return;
       }
 
-      const { data } = response;
-      setCandidates(Array.from(data.candidates));
-      setCandidateResults(Array.from(data.candidateResults));
-      setWarnings(Array.from(data.warnings));
+      const { data: uploadData } = uploadResponse;
+      setCandidates(Array.from(uploadData.candidates));
+      setCandidateResults(Array.from(uploadData.candidateResults));
+      setWarnings(Array.from(uploadData.warnings));
 
-      if (data.successfulCount > 0 && data.failedCount === 0) {
+      if (uploadData.candidates.length === 0) {
+        if (uploadData.failedCount > 0) {
+          setGeneralError(
+            `Failed to extract candidate profiles from all ${uploadData.totalProcessed} uploaded resume(s). See error details below.`
+          );
+        } else {
+          setGeneralError("No candidate profiles could be extracted from uploaded files.");
+        }
+        return;
+      }
+
+      // Step 2: Rank extracted candidates against job requisition via server API
+      const rankResponse = await rankApi({
+        jobDescription: {
+          title: jobTitle,
+          rawText: jobDescriptionText,
+        },
+        candidates: uploadData.candidates,
+      });
+
+      if (!rankResponse.ok) {
+        setGeneralError(`Extraction succeeded, but ranking failed: ${rankResponse.error}`);
+        return;
+      }
+
+      const rankedResults = Array.from(rankResponse.data.results);
+      setResults(rankedResults);
+
+      if (uploadData.successfulCount > 0 && uploadData.failedCount === 0) {
         setRankingNotice(
-          `Successfully processed and extracted ${data.successfulCount} candidate profile(s). Ready for matching.`
+          `Successfully evaluated and ranked ${rankedResults.length} candidate(s) against "${jobTitle || "Job Requisition"}".`
         );
-      } else if (data.successfulCount > 0 && data.failedCount > 0) {
+      } else if (uploadData.successfulCount > 0 && uploadData.failedCount > 0) {
         setRankingNotice(
-          `Processed ${data.totalProcessed} resume(s): ${data.successfulCount} extracted successfully, ${data.failedCount} had errors.`
+          `Ranked ${rankedResults.length} candidate(s). ${uploadData.failedCount} resume(s) had extraction issues (see details below).`
         );
-      } else if (data.successfulCount === 0 && data.failedCount > 0) {
-        setGeneralError(
-          `Failed to extract candidate profiles from all ${data.totalProcessed} uploaded resume(s). See error details below.`
-        );
-      } else {
-        setRankingNotice("Resume screening completed.");
       }
     } catch (err) {
       setGeneralError(
@@ -181,14 +214,14 @@ export function useScreeningWorkflow(options: UseScreeningWorkflowOptions = {}) 
     } finally {
       setIsEvaluating(false);
     }
-  }, [isEvaluating, jobDescriptionText, files, screeningApi]);
+  }, [isEvaluating, jobDescriptionText, jobTitle, files, screeningApi, rankApi]);
 
   const state: ScreeningWorkflowState = {
     jobTitle,
     jobDescriptionText,
     files,
     isEvaluating,
-    results: [],
+    results,
     candidates,
     candidateResults,
     warnings,

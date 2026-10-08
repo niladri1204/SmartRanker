@@ -1,5 +1,7 @@
-import { Candidate, ResumeDocument } from "@/types";
+import { Candidate, RankingResult, ResumeDocument } from "@/types";
+import type { ProcessedJobDescription } from "@/server/intelligence";
 import { CandidateProcessingResult, UploadedFileItem } from "./types";
+import { RankingWeightsInput } from "@/server/matching";
 
 export interface ScreeningApiSuccessData {
   readonly success: boolean;
@@ -14,6 +16,33 @@ export interface ScreeningApiSuccessData {
 
 export type ScreeningApiResponse =
   | { readonly ok: true; readonly data: ScreeningApiSuccessData }
+  | { readonly ok: false; readonly error: string; readonly code?: string };
+
+export interface ScreeningRankApiRequest {
+  readonly jobDescription: {
+    readonly id?: string;
+    readonly title?: string;
+    readonly rawText: string;
+    readonly requiredSkills?: readonly string[];
+    readonly preferredSkills?: readonly string[];
+    readonly minExperienceYears?: number;
+    readonly educationRequirements?: readonly string[];
+  };
+  readonly candidates: readonly Candidate[];
+  readonly rankingWeights?: RankingWeightsInput;
+}
+
+export interface ScreeningRankApiSuccessData {
+  readonly success: boolean;
+  readonly message?: string;
+  readonly totalCandidates: number;
+  readonly results: readonly RankingResult[];
+  readonly jobDescription?: ProcessedJobDescription;
+  readonly warnings?: readonly string[];
+}
+
+export type ScreeningRankApiResponse =
+  | { readonly ok: true; readonly data: ScreeningRankApiSuccessData }
   | { readonly ok: false; readonly error: string; readonly code?: string };
 
 export interface ScreeningApiOptions {
@@ -139,6 +168,84 @@ export async function submitScreeningResumes(
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Network error occurred while uploading resumes.";
+    return {
+      ok: false,
+      error: message,
+      code: "NETWORK_ERROR",
+    };
+  }
+}
+
+/**
+ * Dispatches candidate profiles and job requisition to the server-side ranking API.
+ * Returns ranked results in deterministic sort order with match gap analysis.
+ */
+export async function rankScreeningCandidates(
+  request: ScreeningRankApiRequest,
+  options: ScreeningApiOptions = {}
+): Promise<ScreeningRankApiResponse> {
+  if (!request.candidates || request.candidates.length === 0) {
+    return {
+      ok: false,
+      error: "No candidate profiles provided for ranking.",
+      code: "NO_CANDIDATES",
+    };
+  }
+
+  const fetchFn = options.fetchFn ?? fetch;
+  const endpoint = options.endpoint ?? "/api/screening/rank";
+
+  try {
+    const response = await fetchFn(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    let json: Record<string, unknown> | null = null;
+    try {
+      json = (await response.json()) as Record<string, unknown>;
+    } catch {
+      return {
+        ok: false,
+        error: `Server returned status ${response.status} with an unreadable response format.`,
+        code: "INVALID_JSON_RESPONSE",
+      };
+    }
+
+    if (!response.ok || !json) {
+      const errorMsg =
+        typeof json?.error === "string"
+          ? json.error
+          : `Ranking failed with HTTP status ${response.status}.`;
+      const code = typeof json?.code === "string" ? json.code : undefined;
+      return {
+        ok: false,
+        error: errorMsg,
+        code,
+      };
+    }
+
+    const rawResults = Array.isArray(json.results) ? (json.results as RankingResult[]) : [];
+    const totalCandidates =
+      typeof json.totalCandidates === "number" ? json.totalCandidates : rawResults.length;
+
+    return {
+      ok: true,
+      data: {
+        success: Boolean(json.success),
+        message: typeof json.message === "string" ? json.message : undefined,
+        totalCandidates,
+        results: rawResults,
+        jobDescription: json.jobDescription as ProcessedJobDescription | undefined,
+        warnings: Array.isArray(json.warnings) ? (json.warnings as string[]) : [],
+      },
+    };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Network error occurred while ranking candidates.";
     return {
       ok: false,
       error: message,
