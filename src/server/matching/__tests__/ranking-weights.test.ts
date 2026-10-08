@@ -85,6 +85,20 @@ describe("Phase 3.5: Configurable Ranking Weights", () => {
       normalized.educationWeight;
     expect(normSum).toBe(100);
 
+    // Fractional inputs (0.50, 0.20, etc.) are safely scaled to percentage representation
+    const fromFractional = validateRankingWeights({
+      requiredSkillsWeight: 0.50,
+      semanticSimilarityWeight: 0.20,
+      experienceWeight: 0.15,
+      preferredSkillsWeight: 0.10,
+      educationWeight: 0.05,
+    });
+    expect(fromFractional.requiredSkillsWeight).toBe(50);
+    expect(fromFractional.semanticSimilarityWeight).toBe(20);
+    expect(fromFractional.experienceWeight).toBe(15);
+    expect(fromFractional.preferredSkillsWeight).toBe(10);
+    expect(fromFractional.educationWeight).toBe(5);
+
     // Engine configured with custom heavy skills weighting (80% skills, 20% experience)
     const customEngine = new RankingEngineService({
       rankingWeights: {

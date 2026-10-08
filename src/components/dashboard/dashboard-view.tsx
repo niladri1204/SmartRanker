@@ -6,6 +6,7 @@ import { JobDescriptionPanel } from "./job-description-panel";
 import { ResumeUploadZone } from "./resume-upload-zone";
 import { EmptyResultsState } from "./empty-results-state";
 import { CandidateResultsList } from "./candidate-results-list";
+import { RankingWeightControls } from "./ranking-weight-controls";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { APP_CONFIG } from "@/config/app";
@@ -26,6 +27,12 @@ export function DashboardView() {
     hasValidInputs,
     state,
     rankingNotice,
+    rankingWeights,
+    updateWeight,
+    resetWeights,
+    applyCustomWeights,
+    isReRanking,
+    weightsError,
   } = useScreeningWorkflow();
 
   return (
@@ -76,6 +83,18 @@ export function DashboardView() {
           error={state.validationErrors.files}
         />
       </div>
+
+      {/* Ranking Weights Customization Panel */}
+      <RankingWeightControls
+        weights={rankingWeights}
+        onChange={updateWeight}
+        onReset={resetWeights}
+        onApply={applyCustomWeights}
+        isReRanking={isReRanking}
+        isEvaluating={state.isEvaluating}
+        hasCandidates={state.candidates.length > 0}
+        error={weightsError}
+      />
 
       {/* Action Bar */}
       <div className="flex flex-col items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:p-5">

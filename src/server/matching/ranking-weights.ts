@@ -9,12 +9,15 @@ export type { RankingWeights, RankingWeightsInput };
 
 /**
  * Default ranking weights adhering to Phase 3 baseline:
- * - Required skills: 40%
- * - Semantic similarity: 25%
- * - Experience: 20%
- * - Preferred skills: 10%
- * - Education: 5%
+ * - Required skills: 40 (40%)
+ * - Semantic similarity: 25 (25%)
+ * - Experience: 20 (20%)
+ * - Preferred skills: 10 (10%)
+ * - Education: 5 (5%)
  * Totaling 100%.
+ *
+ * NOTE: Throughout SmartRanker, RankingWeights and RankingResult.appliedWeights
+ * always use percentage numbers summing to 100 (e.g. 50, 20, 15, 10, 5), NOT fractional decimals (0.50, 0.20, etc.).
  */
 export const DEFAULT_RANKING_WEIGHTS: RankingWeights = Object.freeze({
   requiredSkillsWeight: 40,

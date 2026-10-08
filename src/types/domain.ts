@@ -168,6 +168,11 @@ export interface SkillComparisonResult {
   readonly matchScore: number;
 }
 
+/**
+ * Input configuration for custom ranking dimension weights.
+ * Values are non-negative percentage numbers summing to 100 (e.g. 50, 20, 15, 10, 5),
+ * NOT fractional decimals (0.50, 0.20, etc.).
+ */
 export interface RankingWeightsInput {
   readonly requiredSkillsWeight?: number;
   readonly semanticSimilarityWeight?: number;
@@ -176,6 +181,18 @@ export interface RankingWeightsInput {
   readonly educationWeight?: number;
 }
 
+/**
+ * Validated ranking dimension weights represented as percentage values (0-100) summing to 100.
+ *
+ * Example:
+ * - requiredSkillsWeight: 50 (50%)
+ * - semanticSimilarityWeight: 20 (20%)
+ * - experienceWeight: 15 (15%)
+ * - preferredSkillsWeight: 10 (10%)
+ * - educationWeight: 5 (5%)
+ *
+ * NOTE: Values are percentage numbers summing to 100, NOT fractional decimals (0.50, 0.20, etc.).
+ */
 export interface RankingWeights {
   readonly requiredSkillsWeight: number;
   readonly semanticSimilarityWeight: number;
@@ -301,7 +318,12 @@ export interface RankingResult {
   semanticModel?: string;
 semanticAvailability?: SemanticAvailability;
 skillMatches?: readonly SkillMatchResult[];
-appliedWeights?: RankingWeights;
+  /**
+   * Active ranking weights applied during evaluation, represented as percentage values (0-100)
+   * summing to 100 (e.g. { requiredSkillsWeight: 50, semanticSimilarityWeight: 20, experienceWeight: 15, preferredSkillsWeight: 10, educationWeight: 5 }).
+   * Uses the SAME percentage representation as RankingWeights (NOT fractional decimals 0.50, 0.20, etc.).
+   */
+  appliedWeights?: RankingWeights;
   matchAnalysis?: MatchGapAnalysis;
   scoreBreakdown: ScoreBreakdown;
   explanations?: string[];

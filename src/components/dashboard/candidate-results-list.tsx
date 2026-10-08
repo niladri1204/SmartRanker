@@ -95,6 +95,14 @@ export function CandidateResultsList({
               ? "Candidates ranked deterministically against job competencies, experience, education, and semantic relevance."
               : "Structured candidate profiles extracted from uploaded resume documents."}
           </p>
+          {hasRankedResults && rankingResults && rankingResults[0]?.appliedWeights && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-slate-400">
+              <span className="font-semibold text-slate-300">Applied Weights:</span>
+              <span className="rounded-md border border-slate-800 bg-slate-950/60 px-2 py-0.5 font-mono text-[10px] text-slate-300">
+                {"Skills " + rankingResults[0].appliedWeights.requiredSkillsWeight + "% • Semantic " + rankingResults[0].appliedWeights.semanticSimilarityWeight + "% • Exp " + rankingResults[0].appliedWeights.experienceWeight + "% • Pref " + rankingResults[0].appliedWeights.preferredSkillsWeight + "% • Edu " + rankingResults[0].appliedWeights.educationWeight + "%"}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Recruiter Controls Toolbar */}

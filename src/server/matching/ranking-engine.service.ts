@@ -698,7 +698,7 @@ export class RankingEngineService implements IMatchingEngine {
       matchedEducationRequirements,
       experienceEvaluation,
       skillMatches: allSkillMatches,
-      appliedWeights: weights,
+      appliedWeights: weights, // Percentage representation summing to 100 (e.g. 50, 20, 15, 10, 5, NOT 0.50, 0.20)
       semanticEvaluation,
       semanticScore: hasSemanticDim ? semanticEvaluation.normalizedScore : undefined,
       semanticSimilarity: hasSemanticDim ? semanticEvaluation.rawCosineSimilarity : undefined,

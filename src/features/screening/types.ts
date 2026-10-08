@@ -1,4 +1,12 @@
-import { Candidate, RankingResult, ResumeDocument } from "@/types";
+import { Candidate, RankingResult, RankingWeights, ResumeDocument } from "@/types";
+
+export const DEFAULT_FRONTEND_RANKING_WEIGHTS: RankingWeights = Object.freeze({
+  requiredSkillsWeight: 40,
+  semanticSimilarityWeight: 25,
+  experienceWeight: 20,
+  preferredSkillsWeight: 10,
+  educationWeight: 5,
+});
 
 export interface UploadedFileItem {
   readonly id: string;
@@ -24,6 +32,7 @@ export interface ScreeningWorkflowState {
   readonly jobDescriptionText: string;
   readonly files: readonly UploadedFileItem[];
   readonly isEvaluating: boolean;
+  readonly isReRanking: boolean;
   readonly results: readonly RankingResult[];
   readonly candidates: readonly Candidate[];
   readonly candidateResults: readonly CandidateProcessingResult[];
@@ -32,7 +41,10 @@ export interface ScreeningWorkflowState {
   readonly validationErrors: {
     readonly jobDescription?: string;
     readonly files?: string;
+    readonly weights?: string;
   };
+  readonly rankingWeights: RankingWeights;
+  readonly appliedWeights?: RankingWeights;
 }
 
 export type ScreeningTab = "editor" | "resumes" | "results";
