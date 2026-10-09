@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
+import { CandidateComparisonModal } from "./candidate-comparison-modal";
 import {
   Candidate,
   CandidateEducation,
@@ -19,6 +20,16 @@ export interface CandidateResultsListProps {
   readonly candidates: readonly Candidate[];
   readonly rankingResults?: readonly RankingResult[];
   readonly warnings: readonly string[];
+  readonly onExport?: (format: "csv" | "pdf") => Promise<void> | void;
+  readonly isExporting?: boolean;
+  readonly exportingFormat?: "csv" | "pdf" | null;
+  readonly exportError?: string | null;
+  readonly selectedCandidateIds?: readonly string[];
+  readonly onToggleSelectCandidate?: (candidateId: string) => void;
+  readonly onClearComparisonSelection?: () => void;
+  readonly isComparisonOpen?: boolean;
+  readonly onOpenComparison?: () => void;
+  readonly onCloseComparison?: () => void;
 }
 
 export function CandidateResultsList({
@@ -26,10 +37,93 @@ export function CandidateResultsList({
   candidates,
   rankingResults,
   warnings,
+  onExport,
+  isExporting = false,
+  exportingFormat = null,
+  exportError,
+  selectedCandidateIds: controlledSelectedIds,
+  onToggleSelectCandidate,
+  onClearComparisonSelection,
+  isComparisonOpen: controlledIsComparisonOpen,
+  onOpenComparison,
+  onCloseComparison,
 }: CandidateResultsListProps) {
   const [filterMissingSkillsOnly, setFilterMissingSkillsOnly] = useState(false);
   const [expandAllBreakdowns, setExpandAllBreakdowns] = useState<boolean | undefined>(undefined);
   const [expandAllAnalysis, setExpandAllAnalysis] = useState<boolean | undefined>(undefined);
+
+  // Candidate comparison selection state
+  const [internalSelectedIds, setInternalSelectedIds] = useState<string[]>([]);
+  const [internalIsComparisonOpen, setInternalIsComparisonOpen] = useState(false);
+
+  const selectedIds =
+    controlledSelectedIds !== undefined ? controlledSelectedIds : internalSelectedIds;
+  const isComparisonOpen =
+    controlledIsComparisonOpen !== undefined
+      ? controlledIsComparisonOpen
+      : internalIsComparisonOpen;
+
+  const handleToggleCompare = useCallback(
+    (candidateId: string) => {
+      if (onToggleSelectCandidate) {
+        onToggleSelectCandidate(candidateId);
+        return;
+      }
+      setInternalSelectedIds((prev) => {
+        if (prev.includes(candidateId)) {
+          return prev.filter((id) => id !== candidateId);
+        }
+        if (prev.length >= 3) {
+          return prev; // Prevent selecting more than 3
+        }
+        return [...prev, candidateId];
+      });
+    },
+    [onToggleSelectCandidate]
+  );
+
+  const handleClearCompare = useCallback(() => {
+    if (onClearComparisonSelection) {
+      onClearComparisonSelection();
+    } else {
+      setInternalSelectedIds([]);
+    }
+  }, [onClearComparisonSelection]);
+
+  const handleRemoveCompareCandidate = useCallback(
+    (candidateId: string) => {
+      if (onToggleSelectCandidate) {
+        onToggleSelectCandidate(candidateId);
+      } else {
+        setInternalSelectedIds((prev) => prev.filter((id) => id !== candidateId));
+      }
+    },
+    [onToggleSelectCandidate]
+  );
+
+  const handleOpenComparison = useCallback(() => {
+    if (onOpenComparison) {
+      onOpenComparison();
+    } else {
+      setInternalIsComparisonOpen(true);
+    }
+  }, [onOpenComparison]);
+
+  const handleCloseComparison = useCallback(() => {
+    if (onCloseComparison) {
+      onCloseComparison();
+    } else {
+      setInternalIsComparisonOpen(false);
+    }
+  }, [onCloseComparison]);
+
+  // Selected candidates for comparison preserving exact server ranking order
+  const selectedCandidates = useMemo(() => {
+    if (!rankingResults) return [];
+    return rankingResults.filter((r) =>
+      selectedIds.includes(r.candidateId || r.id)
+    );
+  }, [rankingResults, selectedIds]);
 
   const hasRankedResults = Boolean(rankingResults && rankingResults.length > 0);
 
@@ -137,9 +231,118 @@ export function CandidateResultsList({
             >
               <span>{expandAllAnalysis ? "Collapse Analysis" : "Expand Analysis"}</span>
             </Button>
+
+            {/* Export CSV Button */}
+            {onExport && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onExport("csv")}
+                disabled={isExporting}
+                isLoading={isExporting && exportingFormat === "csv"}
+                className="text-xs text-slate-300 hover:text-white"
+                data-testid="export-csv-button"
+              >
+                <svg
+                  className="h-3.5 w-3.5 mr-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
+                </svg>
+                <span>Export CSV</span>
+              </Button>
+            )}
+
+            {/* Export PDF Button */}
+            {onExport && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onExport("pdf")}
+                disabled={isExporting}
+                isLoading={isExporting && exportingFormat === "pdf"}
+                className="text-xs text-slate-300 hover:text-white"
+                data-testid="export-pdf-button"
+              >
+                <svg
+                  className="h-3.5 w-3.5 mr-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                <span>Export PDF</span>
+              </Button>
+            )}
+
+            {/* Compare Candidates Action */}
+            <Button
+              variant={selectedIds.length >= 2 ? "primary" : "outline"}
+              size="sm"
+              onClick={handleOpenComparison}
+              disabled={selectedIds.length < 2}
+              className="text-xs"
+              data-testid="open-comparison-button"
+              title={
+                selectedIds.length < 2
+                  ? "Select 2 or 3 candidates to compare"
+                  : `Compare ${selectedIds.length} selected candidates`
+              }
+            >
+              <svg
+                className="h-3.5 w-3.5 mr-1"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                />
+              </svg>
+              <span>{`Compare (${selectedIds.length}/3)`}</span>
+            </Button>
+
+            {selectedIds.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearCompare}
+                className="text-xs text-slate-400 hover:text-slate-200"
+                data-testid="clear-comparison-selection"
+              >
+                Clear Selection
+              </Button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Export Error Banner */}
+      {exportError && (
+        <div
+          data-testid="export-error-banner"
+          className="rounded-lg border border-red-500/30 bg-red-950/20 p-3.5 text-xs text-red-300"
+        >
+          <span className="font-semibold text-red-200">Export Error: </span>
+          {exportError}
+        </div>
+      )}
 
       {/* Global Warnings Banner */}
       {warnings.length > 0 && (
@@ -163,6 +366,9 @@ export function CandidateResultsList({
                 result={result}
                 isExpandedBreakdown={expandAllBreakdowns}
                 isExpandedAnalysis={expandAllAnalysis}
+                isSelectedForCompare={selectedIds.includes(result.candidateId || result.id)}
+                onToggleCompare={handleToggleCompare}
+                isCompareDisabled={selectedIds.length >= 3}
               />
             ))
           ) : (
@@ -265,6 +471,13 @@ export function CandidateResultsList({
           </div>
         </div>
       )}
+      {/* Side-by-Side Candidate Comparison Modal */}
+      <CandidateComparisonModal
+        isOpen={isComparisonOpen}
+        onClose={handleCloseComparison}
+        candidates={selectedCandidates}
+        onRemoveCandidate={handleRemoveCompareCandidate}
+      />
     </div>
   );
 }

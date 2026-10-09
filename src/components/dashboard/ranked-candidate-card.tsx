@@ -12,6 +12,9 @@ export interface RankedCandidateCardProps {
   readonly isExpandedAnalysis?: boolean;
   readonly onToggleBreakdown?: () => void;
   readonly onToggleAnalysis?: () => void;
+  readonly isSelectedForCompare?: boolean;
+  readonly onToggleCompare?: (candidateId: string) => void;
+  readonly isCompareDisabled?: boolean;
 }
 
 const ATTENTION_FLAG_LABELS: Record<
@@ -51,6 +54,9 @@ export function RankedCandidateCard({
   isExpandedAnalysis: controlledAnalysis,
   onToggleBreakdown,
   onToggleAnalysis,
+  isSelectedForCompare = false,
+  onToggleCompare,
+  isCompareDisabled = false,
 }: RankedCandidateCardProps) {
   const [internalBreakdownOpen, setInternalBreakdownOpen] = useState(false);
   const [internalAnalysisOpen, setInternalAnalysisOpen] = useState(false);
@@ -434,47 +440,68 @@ export function RankedCandidateCard({
           </div>
         </div>
 
-        {/* Action Controls for Score Breakdown & Match Analysis */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/60">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleBreakdown}
-            className="text-xs text-slate-300 hover:text-white"
-            aria-expanded={breakdownOpen}
-          >
-            <span>Score Breakdown</span>
-            <svg
-              className={`h-3.5 w-3.5 transition-transform duration-200 ${
-                breakdownOpen ? "rotate-180" : ""
-              }`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+        {/* Action Controls for Score Breakdown, Match Analysis & Compare */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleBreakdown}
+              className="text-xs text-slate-300 hover:text-white"
+              aria-expanded={breakdownOpen}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </Button>
+              <span>Score Breakdown</span>
+              <svg
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                  breakdownOpen ? "rotate-180" : ""
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleAnalysis}
-            className="text-xs text-slate-300 hover:text-white"
-            aria-expanded={analysisOpen}
-          >
-            <span>Match Analysis</span>
-            <svg
-              className={`h-3.5 w-3.5 transition-transform duration-200 ${
-                analysisOpen ? "rotate-180" : ""
-              }`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleAnalysis}
+              className="text-xs text-slate-300 hover:text-white"
+              aria-expanded={analysisOpen}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-            </svg>
-          </Button>
+              <span>Match Analysis</span>
+              <svg
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                  analysisOpen ? "rotate-180" : ""
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </Button>
+          </div>
+
+          {/* Candidate Compare Toggle */}
+          {onToggleCompare && (
+            <Button
+              variant={isSelectedForCompare ? "primary" : "outline"}
+              size="sm"
+              onClick={() => onToggleCompare(result.candidateId || result.id)}
+              disabled={isCompareDisabled && !isSelectedForCompare}
+              className="text-xs"
+              data-testid={`compare-candidate-button-${result.rank}`}
+              title={
+                isCompareDisabled && !isSelectedForCompare
+                  ? "Maximum 3 candidates can be compared at once"
+                  : undefined
+              }
+            >
+              <span>{isSelectedForCompare ? "✓ Selected to Compare" : "+ Compare"}</span>
+            </Button>
+          )}
         </div>
 
         {/* Expandable Section 1: Score Breakdown */}
