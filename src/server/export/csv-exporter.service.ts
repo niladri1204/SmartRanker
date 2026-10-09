@@ -54,7 +54,7 @@ export class CsvExporterService {
 
     const metadataLines: string[] = [
       "# SmartRanker Candidate Ranking Export",
-      `# Job Requisition: ${jobTitle || "Requisition"}`,
+      `# Job Requisition: ${(jobTitle || "Requisition").replace(/[\r\n]+/g, " ")}`,
       `# Generated At: ${generatedAt}`,
       `# Applied Ranking Weights: ${weightsDescription}`,
       `# Total Candidates: ${rankingResults.length}`,

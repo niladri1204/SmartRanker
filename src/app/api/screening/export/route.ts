@@ -124,7 +124,7 @@ export async function POST(
       rankingResults,
     });
 
-    return new Response(exportResult.data as unknown as BodyInit, {
+    return new Response(new Uint8Array(exportResult.data), {
       status: 200,
       headers: {
         "Content-Type": exportResult.mimeType,

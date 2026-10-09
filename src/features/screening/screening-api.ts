@@ -1,7 +1,6 @@
-import { Candidate, RankingResult, ResumeDocument } from "@/types";
+import { Candidate, RankingResult, RankingWeightsInput, ResumeDocument } from "@/types";
 import type { ProcessedJobDescription } from "@/server/intelligence";
 import { CandidateProcessingResult, UploadedFileItem } from "./types";
-import { RankingWeightsInput } from "@/server/matching";
 
 export interface ScreeningApiSuccessData {
   readonly success: boolean;

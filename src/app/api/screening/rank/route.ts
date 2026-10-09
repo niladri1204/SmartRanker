@@ -11,7 +11,11 @@ import {
   jobDescriptionProcessorService,
   ProcessedJobDescription,
 } from "@/server/intelligence";
-import { rankingEngineService, RankingWeightsInput } from "@/server/matching";
+import {
+  rankingEngineService,
+  RankingWeightsInput,
+  InvalidRankingWeightsError,
+} from "@/server/matching";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -221,6 +225,17 @@ export async function POST(
       { status: 200 }
     );
   } catch (err) {
+    if (err instanceof InvalidRankingWeightsError) {
+      return NextResponse.json<ScreeningRankApiErrorResponse>(
+        {
+          success: false,
+          error: err.message,
+          code: err.code,
+        },
+        { status: 400 }
+      );
+    }
+
     const sanitizedError =
       err instanceof Error && err.message
         ? err.message.replace(/(?:[A-Za-z]:)?(?:[\\/][a-zA-Z0-9_.-]+)+/g, "[internal-path]")
