@@ -16,17 +16,22 @@ import { SAMPLE_JOB_PRESETS } from "./sample-jobs";
 import {
   submitScreeningResumes,
   rankScreeningCandidates,
+  exportRankedResults,
+  downloadBlob,
 } from "./screening-api";
+import { ExportFormat } from "./types";
 
 export interface UseScreeningWorkflowOptions {
   readonly screeningApi?: typeof submitScreeningResumes;
   readonly rankApi?: typeof rankScreeningCandidates;
+  readonly exportApi?: typeof exportRankedResults;
 }
 
 export function useScreeningWorkflow(options: UseScreeningWorkflowOptions = {}) {
   const {
     screeningApi = submitScreeningResumes,
     rankApi = rankScreeningCandidates,
+    exportApi = exportRankedResults,
   } = options;
 
   const [jobTitle, setJobTitle] = useState<string>("");
@@ -34,6 +39,9 @@ export function useScreeningWorkflow(options: UseScreeningWorkflowOptions = {}) 
   const [files, setFiles] = useState<UploadedFileItem[]>([]);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [isReRanking, setIsReRanking] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [results, setResults] = useState<RankingResult[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [candidateResults, setCandidateResults] = useState<CandidateProcessingResult[]>([]);
@@ -300,17 +308,57 @@ export function useScreeningWorkflow(options: UseScreeningWorkflowOptions = {}) 
     }
   }, [isReRanking, isEvaluating, rankingWeights, candidates, jobTitle, jobDescriptionText, rankApi]);
 
+  // Export results handler
+  const exportResults = useCallback(
+    async (format: ExportFormat) => {
+      if (isExporting || results.length === 0) {
+        return;
+      }
+      setIsExporting(true);
+      setExportingFormat(format);
+      setExportError(null);
+
+      try {
+        const response = await exportApi({
+          format,
+          jobTitle: jobTitle.trim() || undefined,
+          rankingResults: results,
+        });
+
+        if (!response.ok) {
+          setExportError(response.error);
+          return;
+        }
+
+        downloadBlob(response.blob, response.filename);
+      } catch (err) {
+        setExportError(
+          err instanceof Error
+            ? err.message
+            : "An unexpected error occurred during export."
+        );
+      } finally {
+        setIsExporting(false);
+        setExportingFormat(null);
+      }
+    },
+    [isExporting, results, jobTitle, exportApi]
+  );
+
   const state: ScreeningWorkflowState = {
     jobTitle,
     jobDescriptionText,
     files,
     isEvaluating,
     isReRanking,
+    isExporting,
+    exportingFormat,
     results,
     candidates,
     candidateResults,
     warnings,
     generalError,
+    exportError,
     validationErrors: {
       jobDescription: jobDescError,
       files: filesError,
@@ -341,5 +389,9 @@ export function useScreeningWorkflow(options: UseScreeningWorkflowOptions = {}) 
     applyCustomWeights,
     isReRanking,
     weightsError,
+    exportResults,
+    isExporting,
+    exportingFormat,
+    exportError,
   };
 }

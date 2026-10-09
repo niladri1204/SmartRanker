@@ -33,6 +33,10 @@ export function DashboardView() {
     applyCustomWeights,
     isReRanking,
     weightsError,
+    exportResults,
+    isExporting,
+    exportingFormat,
+    exportError,
   } = useScreeningWorkflow();
 
   return (
@@ -202,6 +206,10 @@ export function DashboardView() {
             candidates={state.candidates}
             rankingResults={state.results}
             warnings={state.warnings}
+            onExport={exportResults}
+            isExporting={isExporting}
+            exportingFormat={exportingFormat}
+            exportError={exportError}
           />
         ) : (
           <>

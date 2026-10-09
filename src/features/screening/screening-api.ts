@@ -253,3 +253,121 @@ export async function rankScreeningCandidates(
     };
   }
 }
+
+export interface ScreeningExportApiRequest {
+  readonly format: "csv" | "pdf";
+  readonly jobTitle?: string;
+  readonly rankingResults: readonly RankingResult[];
+}
+
+export type ScreeningExportApiResponse =
+  | {
+      readonly ok: true;
+      readonly blob: Blob;
+      readonly filename: string;
+      readonly format: "csv" | "pdf";
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+      readonly code?: string;
+    };
+
+/**
+ * Triggers browser download of a generated file Blob.
+ */
+export function downloadBlob(blob: Blob, filename: string): void {
+  if (typeof window === "undefined" || !window.URL || !window.document) {
+    return;
+  }
+  const url = window.URL.createObjectURL(blob);
+  const a = window.document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.style.display = "none";
+  window.document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    if (a.parentNode) {
+      a.parentNode.removeChild(a);
+    }
+    window.URL.revokeObjectURL(url);
+  }, 100);
+}
+
+/**
+ * Dispatches export request to the server-side export API endpoint.
+ * Returns the downloaded Blob and filename or safe error details.
+ */
+export async function exportRankedResults(
+  request: ScreeningExportApiRequest,
+  options: ScreeningApiOptions = {}
+): Promise<ScreeningExportApiResponse> {
+  if (!request.rankingResults || request.rankingResults.length === 0) {
+    return {
+      ok: false,
+      error: "No candidate ranking results available for export.",
+      code: "NO_RESULTS",
+    };
+  }
+
+  const fetchFn = options.fetchFn ?? fetch;
+  const endpoint = options.endpoint ?? "/api/screening/export";
+
+  try {
+    const response = await fetchFn(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      let errorMsg = `Export failed with HTTP status ${response.status}.`;
+      let code: string | undefined = undefined;
+      try {
+        const json = await response.json();
+        if (typeof json?.error === "string") {
+          errorMsg = json.error;
+        }
+        if (typeof json?.code === "string") {
+          code = json.code;
+        }
+      } catch {
+        // Fall back to default status message
+      }
+      return {
+        ok: false,
+        error: errorMsg,
+        code,
+      };
+    }
+
+    // Extract filename from Content-Disposition header if available
+    let filename = `smartranker-ranking.${request.format}`;
+    const disposition = response.headers.get("content-disposition");
+    if (disposition) {
+      const match = /filename=["']?([^"';]+)["']?/.exec(disposition);
+      if (match && match[1]) {
+        filename = match[1].trim();
+      }
+    }
+
+    const blob = await response.blob();
+    return {
+      ok: true,
+      blob,
+      filename,
+      format: request.format,
+    };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Network error occurred during export.";
+    return {
+      ok: false,
+      error: message,
+      code: "NETWORK_ERROR",
+    };
+  }
+}

@@ -27,17 +27,22 @@ export interface CandidateProcessingResult {
   readonly error?: string;
 }
 
+export type ExportFormat = "csv" | "pdf";
+
 export interface ScreeningWorkflowState {
   readonly jobTitle: string;
   readonly jobDescriptionText: string;
   readonly files: readonly UploadedFileItem[];
   readonly isEvaluating: boolean;
   readonly isReRanking: boolean;
+  readonly isExporting: boolean;
+  readonly exportingFormat: ExportFormat | null;
   readonly results: readonly RankingResult[];
   readonly candidates: readonly Candidate[];
   readonly candidateResults: readonly CandidateProcessingResult[];
   readonly warnings: readonly string[];
   readonly generalError: string | null;
+  readonly exportError: string | null;
   readonly validationErrors: {
     readonly jobDescription?: string;
     readonly files?: string;
