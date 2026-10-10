@@ -116,7 +116,11 @@ export async function POST(
     }
 
     // 1. Validate candidates array
-    const candidates = Array.isArray(body?.candidates) ? body.candidates : [];
+    const rawCandidates = Array.isArray(body?.candidates) ? body.candidates : [];
+    const candidates = rawCandidates.filter(
+      (c): c is Candidate =>
+        Boolean(c && typeof c === "object" && typeof c.id === "string" && c.id.trim().length > 0)
+    );
     if (candidates.length === 0) {
       return NextResponse.json<ScreeningRankApiErrorResponse>(
         {
@@ -143,6 +147,26 @@ export async function POST(
         },
         { status: 400 }
       );
+    }
+
+    // Validate and clamp minExperienceYears if provided
+    let minExperienceYears: number | undefined = undefined;
+    if (jdInput?.minExperienceYears !== undefined) {
+      if (
+        typeof jdInput.minExperienceYears !== "number" ||
+        !Number.isFinite(jdInput.minExperienceYears)
+      ) {
+        return NextResponse.json<ScreeningRankApiErrorResponse>(
+          {
+            success: false,
+            error:
+              "Invalid minExperienceYears provided. Must be a finite number.",
+            code: "INVALID_EXPERIENCE_REQUIREMENT",
+          },
+          { status: 400 }
+        );
+      }
+      minExperienceYears = Math.max(0, jdInput.minExperienceYears);
     }
 
     // 3. Process or normalize JobDescription
@@ -174,10 +198,10 @@ export async function POST(
         requiredSkills,
         preferredSkills,
         experienceRequirement:
-          jdInput?.minExperienceYears !== undefined
+          minExperienceYears !== undefined
             ? {
-                minimumYears: jdInput.minExperienceYears,
-                rawText: `${jdInput.minExperienceYears} years`,
+                minimumYears: minExperienceYears,
+                rawText: `${minExperienceYears} years`,
               }
             : parsed.experienceRequirement,
         educationRequirements:
@@ -190,10 +214,10 @@ export async function POST(
         requiredSkills: jdInput?.requiredSkills ?? [],
         preferredSkills: jdInput?.preferredSkills ?? [],
         experienceRequirement:
-          jdInput?.minExperienceYears !== undefined
+          minExperienceYears !== undefined
             ? {
-                minimumYears: jdInput.minExperienceYears,
-                rawText: `${jdInput.minExperienceYears} years`,
+                minimumYears: minExperienceYears,
+                rawText: `${minExperienceYears} years`,
               }
             : undefined,
         educationRequirements: jdInput?.educationRequirements ?? [],

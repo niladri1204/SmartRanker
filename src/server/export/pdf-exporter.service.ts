@@ -4,7 +4,7 @@
  * Uses pdf-lib for deterministic, memory-safe PDF generation with multi-page pagination.
  */
 import { PDFDocument, StandardFonts, rgb, RGB } from "pdf-lib";
-import { RankingResult, RankingWeights } from "@/types";
+import type { RankingWeights } from "@/types";
 import { ExportRankedResultsRequest, ExportResult } from "./export.types";
 
 /**
@@ -186,7 +186,7 @@ export class PdfExporterService {
       const candName = sanitizePdfText(
         res.candidateName || res.candidate?.fullName || `Candidate ${rank}`
       );
-      const scoreStr = `${(res.overallScore ?? res.score).toFixed(1)}%`;
+      const scoreStr = `${(res.overallScore ?? res.score ?? 0).toFixed(1)}%`;
       const strength = (res.matchAnalysis?.strength || "MODERATE").toUpperCase();
 
       page.drawText(`#${rank}  ${truncate(candName, 32)}`, {

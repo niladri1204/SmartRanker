@@ -6,6 +6,8 @@ import {
   csvExporterService,
   escapeCsvField,
   InvalidExportInputError,
+  ExportFormat,
+  ExportRankedResultsRequest,
 } from "../index";
 
 const mockWeights: RankingWeights = {
@@ -239,7 +241,7 @@ describe("Phase 3.9: Export Ranked Results", () => {
   it("4. invalid/empty export input fails safely", async () => {
     // Missing payload
     await expect(
-      exportService.exportResults(null as unknown as any)
+      exportService.exportResults(null as unknown as ExportRankedResultsRequest)
     ).rejects.toThrow(InvalidExportInputError);
 
     // Empty ranking results array
@@ -253,7 +255,7 @@ describe("Phase 3.9: Export Ranked Results", () => {
     // Unsupported format
     await expect(
       exportService.exportResults({
-        format: "xlsx" as any,
+        format: "xlsx" as unknown as ExportFormat,
         rankingResults: [createMockRankingResult(1, "Test", 80)],
       })
     ).rejects.toThrow("Unsupported export format 'xlsx'.");

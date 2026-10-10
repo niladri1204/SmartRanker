@@ -825,7 +825,7 @@ export class RankingEngineService implements IMatchingEngine {
       if (b.scoreBreakdown.experienceScore !== a.scoreBreakdown.experienceScore) {
         return b.scoreBreakdown.experienceScore - a.scoreBreakdown.experienceScore;
       }
-      return a.candidateName.localeCompare(b.candidateName);
+      return (a.candidateName || "").localeCompare(b.candidateName || "");
     });
 
     return results.map((res, index) => ({

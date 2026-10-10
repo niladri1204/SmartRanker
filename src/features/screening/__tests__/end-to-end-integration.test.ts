@@ -1,10 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { PDFDocument } from "pdf-lib";
 import { Candidate, RankingResult, RankingWeights, JobDescription } from "@/types";
-import {
-  rankScreeningCandidates,
-  exportRankedResults,
-} from "../screening-api";
 import { CandidateProcessingResult } from "../types";
 import {
   POST as rankRoutePost,

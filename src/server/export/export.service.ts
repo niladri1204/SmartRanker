@@ -61,6 +61,15 @@ export class ExportService {
       );
     }
 
+    const hasInvalidItem = rankingResults.some(
+      (item) => !item || typeof item !== "object"
+    );
+    if (hasInvalidItem) {
+      throw new InvalidExportInputError(
+        "Invalid candidate ranking result item provided for export."
+      );
+    }
+
     const filename = generateExportFilename(format, jobTitle);
 
     try {

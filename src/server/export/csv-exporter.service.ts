@@ -3,19 +3,32 @@
  * Deterministic CSV Exporter for Candidate Ranking Results.
  * Formats ranked candidates into RFC 4180-compliant CSV, including applied weights metadata.
  */
-import { RankingResult, RankingWeights } from "@/types";
+import type { RankingWeights } from "@/types";
 import { ExportRankedResultsRequest, ExportResult } from "./export.types";
 
+const CSV_FORMULA_PREFIXES = ["=", "+", "-", "@", "\t", "\r"];
+
 /**
- * Escapes a cell value according to RFC 4180 rules.
- * Wraps values containing commas, double quotes, or newlines in quotes,
- * and doubles internal double quotes.
+ * Escapes a cell value according to RFC 4180 rules and neutralizes CSV formula injection (CWE-1236).
+ * Prepends a single quote (') if the text value begins with formula execution characters
+ * (=, +, -, @, \t, \r), preventing formula execution in Excel / Google Sheets / LibreOffice.
+ * Wraps values containing commas, double quotes, or newlines in double quotes.
  */
 export function escapeCsvField(value: unknown): string {
   if (value === null || value === undefined) {
     return "";
   }
-  const str = String(value);
+  let str = String(value);
+
+  // CSV Formula Injection mitigation (OWASP / CWE-1236)
+  if (
+    typeof value !== "number" &&
+    CSV_FORMULA_PREFIXES.some((prefix) => str.startsWith(prefix)) &&
+    !/^-?\d+(?:\.\d+)?%?$/.test(str)
+  ) {
+    str = `'${str}`;
+  }
+
   if (
     str.includes(",") ||
     str.includes('"') ||
@@ -82,7 +95,7 @@ export class CsvExporterService {
       const rank = res.rank ?? index + 1;
       const candidateName =
         res.candidateName || res.candidate?.fullName || `Candidate ${rank}`;
-      const overallScore = `${(res.overallScore ?? res.score).toFixed(1)}%`;
+      const overallScore = `${(res.overallScore ?? res.score ?? 0).toFixed(1)}%`;
       const matchStrength = res.matchAnalysis?.strength
         ? res.matchAnalysis.strength.toUpperCase()
         : "N/A";
