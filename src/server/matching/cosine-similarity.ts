@@ -68,7 +68,7 @@ export function normalizeCosineSimilarity(rawScore: number): number {
     return 0;
   }
   const clamped = Math.max(-1, Math.min(1, rawScore));
-  return (clamped + 2) / 2;
+  return (clamped + 1) / 2;
 }
 
 /**
