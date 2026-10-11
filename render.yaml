@@ -1,0 +1,25 @@
+# Render Blueprint Specification for SmartRanker Staging Web Service
+# Documentation: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: smart-ranker-staging
+    runtime: node
+    plan: starter
+    buildCommand: pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 24.21.0
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: NEXT_PUBLIC_MAX_UPLOAD_SIZE_MB
+        value: "10"
+      - key: NEXT_PUBLIC_MAX_RESUME_FILES
+        value: "9"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_EMBEDDING_MODEL
+        value: text-embedding-3-small
