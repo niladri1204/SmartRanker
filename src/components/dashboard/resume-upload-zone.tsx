@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { UploadedFileItem } from "@/features/screening/types";
 import { formatBytes } from "@/lib/utils";
-import { envConfig } from "@/config/env";
+import { clientEnvConfig } from "@/config/client-env";
 
 interface ResumeUploadZoneProps {
   files: readonly UploadedFileItem[];
@@ -93,7 +93,7 @@ export function ResumeUploadZone({
         </div>
         <CardDescription>
           Upload candidate resumes in PDF, DOCX, or TXT format (max{" "}
-          {envConfig.maxUploadSizeBytes / (1024 * 1024)}MB each).
+          {clientEnvConfig.maxUploadSizeBytes / (1024 * 1024)}MB each).
         </CardDescription>
       </CardHeader>
 
@@ -140,7 +140,7 @@ export function ResumeUploadZone({
             drag & drop resumes here
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            Supports batch upload of up to {envConfig.maxResumeFiles} resumes
+            Supports batch upload of up to {clientEnvConfig.maxResumeFiles} resumes
           </p>
         </div>
 

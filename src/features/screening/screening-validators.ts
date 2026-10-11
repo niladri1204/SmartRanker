@@ -1,5 +1,5 @@
 import { APP_CONFIG } from "@/config/app";
-import { envConfig } from "@/config/env";
+import { clientEnvConfig } from "@/config/client-env";
 import { UploadedFileItem } from "./types";
 
 export interface ValidationOutcome {
@@ -37,12 +37,20 @@ export function validateJobDescriptionInput(text: string): ValidationOutcome {
 }
 
 /**
- * Validates an individual candidate file against type, size, and duplicate rules.
+ * Validates an individual candidate file against type, size, duplicate, and batch limit rules.
  */
 export function validateCandidateFile(
   file: File,
   existingFiles: readonly UploadedFileItem[]
 ): ValidationOutcome {
+  // Check batch limit against environment configuration
+  if (existingFiles.length >= clientEnvConfig.maxResumeFiles) {
+    return {
+      isValid: false,
+      error: `Cannot add "${file.name}". Maximum batch limit of ${clientEnvConfig.maxResumeFiles} resumes reached.`,
+    };
+  }
+
   // Check duplicates
   const isDuplicate = existingFiles.some(
     (existing) => existing.name === file.name && existing.size === file.size
@@ -55,8 +63,8 @@ export function validateCandidateFile(
   }
 
   // Check file size
-  if (file.size > envConfig.maxUploadSizeBytes) {
-    const maxMb = envConfig.maxUploadSizeBytes / (1024 * 1024);
+  if (file.size > clientEnvConfig.maxUploadSizeBytes) {
+    const maxMb = clientEnvConfig.maxUploadSizeBytes / (1024 * 1024);
     return {
       isValid: false,
       error: `"${file.name}" exceeds the maximum file size of ${maxMb}MB.`,
@@ -69,7 +77,7 @@ export function validateCandidateFile(
     APP_CONFIG.acceptedFileExtensions as readonly string[]
   ).includes(extension);
   const isMimeAllowed =
-    envConfig.allowedMimeTypes.includes(file.type) || file.type === "";
+    clientEnvConfig.allowedMimeTypes.includes(file.type) || file.type === "";
 
   if (!isExtensionAllowed && !isMimeAllowed) {
     return {

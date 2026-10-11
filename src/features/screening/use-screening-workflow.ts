@@ -20,6 +20,7 @@ import {
   downloadBlob,
 } from "./screening-api";
 import { ExportFormat } from "./types";
+import { clientEnvConfig } from "@/config/client-env";
 
 export interface UseScreeningWorkflowOptions {
   readonly screeningApi?: typeof submitScreeningResumes;
@@ -184,6 +185,13 @@ export function useScreeningWorkflow(options: UseScreeningWorkflowOptions = {}) 
 
     if (files.length === 0) {
       setFilesError("Please upload at least one candidate resume before screening.");
+      return;
+    }
+
+    if (files.length > clientEnvConfig.maxResumeFiles) {
+      setFilesError(
+        `Exceeded maximum batch limit of ${clientEnvConfig.maxResumeFiles} resumes. Please remove some files before screening.`
+      );
       return;
     }
 
