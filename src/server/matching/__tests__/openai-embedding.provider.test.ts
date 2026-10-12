@@ -117,13 +117,13 @@ describe("Phase 3.2: Production OpenAI Embedding Provider", () => {
     expect(batchResults[1]).toEqual([0.3, 0.4]); // index 1
     expect(batchResults[2]).toEqual([0.5, 0.6]); // index 2
 
-    // Dimension inconsistency detection
+
     const inconsistentClient = {
       embeddings: {
         create: async () => ({
           data: [
             { index: 0, embedding: [0.1, 0.2] },
-            { index: 1, embedding: [0.1, 0.2, 0.3] }, // mismatch
+            { index: 1, embedding: [0.1, 0.2, 0.3] },
           ],
           model: "text-embedding-3-small",
         }),
